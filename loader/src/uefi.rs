@@ -1,3 +1,4 @@
+use core::char::{REPLACEMENT_CHARACTER, decode_utf16};
 use core::fmt;
 
 /// [2.3.1 Data Types](https://uefi.org/specs/UEFI/2.11/02_Overview.html#data-types)
@@ -24,6 +25,38 @@ pub struct EFITableHeader {
 
 pub struct CChar(*const u16);
 
+impl CChar {
+    pub fn from_ptr(ptr: *const u16) -> Self {
+        Self(ptr)
+    }
+
+    pub fn len(&self) -> usize {
+        let mut offset = 0;
+        while unsafe { (*self.0.offset(offset as _)).ne(&0) } {
+            offset += 1;
+        }
+        offset
+    }
+
+    pub fn as_slice(&self) -> &[u16] {
+        unsafe { core::slice::from_raw_parts(self.0, self.len()) }
+    }
+
+    pub fn chars(&self) -> impl Iterator<Item = char> {
+        decode_utf16(self.as_slice().iter().cloned()).map(|r| r.unwrap_or(REPLACEMENT_CHARACTER))
+    }
+}
+
+impl fmt::Display for CChar {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.chars().try_for_each(|c| -> fmt::Result {
+            write!(f, "{}", c)?;
+            Ok(())
+        })?;
+        Ok(())
+    }
+}
+
 /// [4.3.1 EFI_SYSTEM_TABLE](https://uefi.org/specs/UEFI/2.11/04_EFI_System_Table.html#id6)
 #[repr(C)]
 pub struct EFISystemTable<'a> {
@@ -31,9 +64,9 @@ pub struct EFISystemTable<'a> {
     pub firmware_vendor: CChar,
     pub firmware_revision: u32,
     pub console_in_handle: EFIHandle,
-    pub conin: *const u8,
+    pub con_in: *const u8,
     pub console_out_handle: EFIHandle,
-    pub conout: &'a EFISimpleTextOutputProtocol,
+    pub con_out: &'a EFISimpleTextOutputProtocol,
 }
 
 const _: () = {
@@ -43,9 +76,9 @@ const _: () = {
     ["vender"][offset_of!(EFISystemTable, firmware_vendor) - 24];
     ["revision"][offset_of!(EFISystemTable, firmware_revision) - 32];
     ["con_in_handle"][offset_of!(EFISystemTable, console_in_handle) - 40];
-    ["conin"][offset_of!(EFISystemTable, conin) - 48];
+    ["conin"][offset_of!(EFISystemTable, con_in) - 48];
     ["con_out_handle"][offset_of!(EFISystemTable, console_out_handle) - 56];
-    ["conout"][offset_of!(EFISystemTable, conout) - 64];
+    ["conout"][offset_of!(EFISystemTable, con_out) - 64];
 };
 
 /// [12.4.1 EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL](https://uefi.org/specs/UEFI/2.11/12_Protocols_Console_Support.html#efi-simple-text-output-protocol)
