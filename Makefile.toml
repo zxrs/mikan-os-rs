@@ -1,0 +1,32 @@
+[tasks.loader]
+script = '''
+cd loader
+cargo build ${@}
+'''
+
+[tasks.clear]
+script = '''
+cd loader
+cargo clean
+'''
+
+[tasks.make-image]
+script = '''
+rm -f disk.img
+qemu-img create -f raw disk.img 200M
+mkfs.fat -n 'MIKAN OS RS' -s 2 -f 2 -R 32 -F 32 disk.img
+mkdir -p mnt
+sudo mount -o loop disk.img mnt
+sudo mkdir -p mnt/EFI/BOOT
+sudo cp loader/target/x86_64-unknown-uefi/debug/loader.efi mnt/EFI/BOOT/BOOTX64.EFI
+sudo umount mnt
+'''
+
+[tasks.launch]
+script = '''
+qemu-system-x86_64 \
+    -drive if=pflash,file=./ovmf/OVMF_CODE.fd \
+    -drive if=pflash,file=./ovmf/OVMF_VARS.fd \
+    -hda disk.img
+'''
+dependencies = ["loader", "make-image"]
