@@ -94,7 +94,7 @@ pub struct EFISimpleTextOutputProtocol {
 }
 
 impl EFISimpleTextOutputProtocol {
-    fn output_string(&self, c: *const u16) {
+    pub fn output_string(&self, c: *const u16) {
         (self.output_string)(self, c);
     }
 
@@ -103,14 +103,14 @@ impl EFISimpleTextOutputProtocol {
     }
 }
 
-pub struct EFISimpleTextOutputProtocolWriter<'a>(pub &'a EFISimpleTextOutputProtocol);
+pub struct EFISimpleTextOutputProtocolWriter<'a>(&'a EFISimpleTextOutputProtocol);
 
 impl<'a> EFISimpleTextOutputProtocolWriter<'a> {
     pub fn new(protocol: &'a EFISimpleTextOutputProtocol) -> Self {
         Self(protocol)
     }
 
-    pub fn write_c(&self, c: u8) -> fmt::Result {
+    pub fn write_char(&mut self, c: u8) -> fmt::Result {
         let buf = [c as u16, 0];
         self.0.output_string(buf.as_ptr());
         Ok(())
@@ -121,9 +121,9 @@ impl<'a> fmt::Write for EFISimpleTextOutputProtocolWriter<'a> {
     fn write_str(&mut self, s: &str) -> fmt::Result {
         s.bytes().try_for_each(|b| -> fmt::Result {
             if b.eq(&b'\n') {
-                self.write_c(b'\r')?;
+                self.write_char(b'\r')?;
             }
-            self.write_c(b)?;
+            self.write_char(b)?;
             Ok(())
         })?;
         Ok(())
