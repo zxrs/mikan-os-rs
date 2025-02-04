@@ -87,6 +87,7 @@ pub struct EFISimpleTextOutputProtocol {
     reset: EFIHandle,
     output_string: fn(&EFISimpleTextOutputProtocol, *const u16) -> EFIStatus,
     test_string: EFIHandle,
+    query_mode: EFIHandle,
     set_mode: EFIHandle,
     set_attribute: EFIHandle,
     clear_screen: fn(&EFISimpleTextOutputProtocol) -> EFIStatus,
