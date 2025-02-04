@@ -1,7 +1,18 @@
+# `cargo make launch` for debug build
+# `cargo make --profile prod launch` for release build
+
 [tasks.loader]
+condition = { env = { "MODE" = "debug" } }
 script = '''
 cd loader
-cargo build ${@}
+cargo build
+'''
+
+[tasks.loader-release]
+condition = { env = { "MODE" = "release" } }
+script = '''
+cd loader
+cargo build --release
 '''
 
 [tasks.clear]
@@ -18,15 +29,25 @@ mkfs.fat -n 'MIKAN OS RS' -s 2 -f 2 -R 32 -F 32 disk.img
 mkdir -p mnt
 sudo mount -o loop disk.img mnt
 sudo mkdir -p mnt/EFI/BOOT
-sudo cp loader/target/x86_64-unknown-uefi/debug/loader.efi mnt/EFI/BOOT/BOOTX64.EFI
+sudo cp loader/target/x86_64-unknown-uefi/${MODE}/loader.efi mnt/EFI/BOOT/BOOTX64.EFI
 sudo umount mnt
 '''
+dependencies = ["loader-release", "loader"]
 
 [tasks.launch]
 script = '''
 qemu-system-x86_64 \
-    -drive if=pflash,file=./ovmf/OVMF_CODE.fd \
-    -drive if=pflash,file=./ovmf/OVMF_VARS.fd \
-    -hda disk.img
+    -drive if=pflash,format=raw,file=./ovmf/OVMF_CODE.fd \
+    -drive if=pflash,format=raw,file=./ovmf/OVMF_VARS.fd \
+    -drive if=ide,index=0,media=disk,format=raw,file=disk.img
 '''
-dependencies = ["loader", "make-image"]
+dependencies = ["make-image"]
+
+[env]
+MODE = "debug"
+
+[env.dev]
+MODE = "debug"
+
+[env.prod]
+MODE = "release"
