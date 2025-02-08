@@ -1,6 +1,8 @@
 use core::char::{REPLACEMENT_CHARACTER, decode_utf16};
 use core::fmt;
 
+pub type Result<T> = core::result::Result<T, &'static str>;
+
 /// [2.3.1 Data Types](https://uefi.org/specs/UEFI/2.11/02_Overview.html#data-types)
 pub type EFIHandle = *const u8;
 
@@ -10,6 +12,14 @@ pub struct EFIStatus(pub usize);
 impl EFIStatus {
     pub fn is_success(&self) -> bool {
         self.0.eq(&0)
+    }
+
+    pub fn ok(&self) -> Result<()> {
+        if self.is_success() {
+            Ok(())
+        } else {
+            Err("failed")
+        }
     }
 }
 
@@ -64,14 +74,18 @@ pub struct EFISystemTable<'a> {
     pub firmware_vendor: CChar,
     pub firmware_revision: u32,
     pub console_in_handle: EFIHandle,
-    pub con_in: *const u8,
-    pub console_out_handle: EFIHandle,
+    con_in: EFIHandle,
+    console_out_handle: EFIHandle,
     pub con_out: &'a EFISimpleTextOutputProtocol,
+    standard_error_handle: EFIHandle,
+    std_err: EFIHandle,
+    runtime_services: EFIHandle,
+    pub boot_services: &'a EFIBootServices,
 }
 
 const _: () = {
     use core::mem::offset_of;
-    ["size"][size_of::<EFISystemTable>() - 72];
+    ["size"][size_of::<EFISystemTable>() - 104];
     ["header"][offset_of!(EFISystemTable, header) - 0];
     ["vender"][offset_of!(EFISystemTable, firmware_vendor) - 24];
     ["revision"][offset_of!(EFISystemTable, firmware_revision) - 32];
@@ -127,5 +141,98 @@ impl<'a> fmt::Write for EFISimpleTextOutputProtocolWriter<'a> {
             Ok(())
         })?;
         Ok(())
+    }
+}
+
+/// [4.4.1. EFI_BOOT_SERVICES](https://uefi.org/specs/UEFI/2.11/04_EFI_System_Table.html#efi-boot-services)
+#[repr(C)]
+pub struct EFIBootServices {
+    header: EFITableHeader,
+    _padding: [EFIHandle; 2],
+    allocate_pages: EFIHandle,
+    free_pages: EFIHandle,
+    get_memory_map: fn(&mut usize, *mut u8, &mut usize, &mut usize, &mut u32) -> EFIStatus,
+}
+
+const MEMORY_MAP_SIZE: usize = 4096 * 2;
+
+impl EFIBootServices {
+    pub fn get_memory_map(&self) -> Result<MemoryMap> {
+        let mut memory_map = MemoryMap::default();
+        (self.get_memory_map)(
+            &mut memory_map.size,
+            memory_map.buf.as_mut_ptr(),
+            &mut memory_map.map_key,
+            &mut memory_map.descriptor_size,
+            &mut memory_map.version,
+        )
+        .ok()?;
+        Ok(memory_map)
+    }
+}
+
+/// [7.2.3. EFI_BOOT_SERVICES.GetMemoryMap()](https://uefi.org/specs/UEFI/2.11/07_Services_Boot_Services.html#efi-boot-services-getmemorymap)
+#[repr(C)]
+#[derive(Debug, Default, Clone, Copy)]
+pub struct EFIMemoryDescriptor {
+    typ: u32,
+    physical_start: u64,
+    virtual_start: u64,
+    number_of_pages: u64,
+    attribute: u64,
+}
+
+#[derive(Debug)]
+pub struct MemoryMap {
+    pub size: usize,
+    pub buf: [u8; MEMORY_MAP_SIZE],
+    pub map_key: usize,
+    pub descriptor_size: usize,
+    pub version: u32,
+}
+
+impl Default for MemoryMap {
+    fn default() -> Self {
+        Self {
+            size: MEMORY_MAP_SIZE,
+            buf: [0; MEMORY_MAP_SIZE],
+            map_key: 0,
+            descriptor_size: 0,
+            version: 0,
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct MemoryDescriptorVisitor<'a> {
+    memory_map: &'a MemoryMap,
+    offset: usize,
+}
+
+impl<'a> MemoryDescriptorVisitor<'a> {
+    pub fn new(memory_map: &'a MemoryMap) -> Self {
+        Self {
+            memory_map,
+            offset: 0,
+        }
+    }
+}
+
+impl<'a> Iterator for MemoryDescriptorVisitor<'a> {
+    type Item = EFIMemoryDescriptor;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.offset > self.memory_map.size - self.memory_map.descriptor_size {
+            return None;
+        }
+
+        let descriptor = self
+            .memory_map
+            .buf
+            .get(self.offset)
+            .map(|p| unsafe { *(p as *const u8 as *const EFIMemoryDescriptor) });
+
+        self.offset += self.memory_map.descriptor_size;
+        descriptor
     }
 }
