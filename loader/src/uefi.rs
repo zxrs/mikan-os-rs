@@ -1,5 +1,6 @@
 use core::char::{REPLACEMENT_CHARACTER, decode_utf16};
 use core::fmt;
+use core::ptr;
 
 pub type Result<T> = core::result::Result<T, &'static str>;
 
@@ -8,6 +9,22 @@ pub type EFIHandle = *const u8;
 
 /// [2.3.1 Data Types](https://uefi.org/specs/UEFI/2.11/02_Overview.html#data-types)
 pub struct EFIStatus(pub usize);
+
+#[repr(C)]
+pub struct GUID {
+    data0: u32,
+    data1: u16,
+    data2: u16,
+    data3: [u8; 8],
+}
+
+/// [12.9.2. EFI_GRAPHICS_OUTPUT_PROTOCOL](https://uefi.org/specs/UEFI/2.11/12_Protocols_Console_Support.html#efi-graphics-output-protocol)
+const EFI_GRAPHICS_OUTPUT_PROTOCOL_GUID: GUID = GUID {
+    data0: 0x9042a9de,
+    data1: 0x23dc,
+    data2: 0x4a38,
+    data3: [0x96, 0xfb, 0x7a, 0xde, 0xd0, 0x80, 0x51, 0x6a],
+};
 
 impl EFIStatus {
     pub fn is_success(&self) -> bool {
@@ -148,10 +165,13 @@ impl<'a> fmt::Write for EFISimpleTextOutputProtocolWriter<'a> {
 #[repr(C)]
 pub struct EFIBootServices {
     header: EFITableHeader,
-    _padding: [EFIHandle; 2],
+    _padding0: [EFIHandle; 2],
     allocate_pages: EFIHandle,
     free_pages: EFIHandle,
     get_memory_map: fn(&mut usize, *mut u8, &mut usize, &mut usize, &mut u32) -> EFIStatus,
+    _padding1: [EFIHandle; 32],
+    /// [7.3.16. EFI_BOOT_SERVICES.LocateProtocol()](https://uefi.org/specs/UEFI/2.11/07_Services_Boot_Services.html#efi-boot-services-locateprotocol)
+    locate_protocol: fn(&GUID, *const u8, *mut *mut u8) -> EFIStatus,
 }
 
 const MEMORY_MAP_SIZE: usize = 4096 * 2;
@@ -168,6 +188,12 @@ impl EFIBootServices {
         )
         .ok()?;
         Ok(memory_map)
+    }
+
+    pub fn locate_protocol<'a, T: Guid>(&self) -> Result<&'a T> {
+        let mut p = ptr::null_mut();
+        (self.locate_protocol)(&T::guid(), ptr::null(), &mut p).ok()?;
+        Ok(unsafe { &*(p as *mut T) })
     }
 }
 
@@ -235,4 +261,46 @@ impl<'a> Iterator for MemoryDescriptorVisitor<'a> {
         self.offset += self.memory_map.descriptor_size;
         descriptor
     }
+}
+
+/// [12.9.2. EFI_GRAPHICS_OUTPUT_PROTOCOL](https://uefi.org/specs/UEFI/2.11/12_Protocols_Console_Support.html#efi-graphics-output-protocol)
+#[repr(C)]
+pub struct EFIGraphicsOutputProtocol<'a> {
+    _padding: [EFIHandle; 3],
+    pub mode: &'a EFIGraphicsOutputProtocolMode<'a>,
+}
+
+trait Guid {
+    fn guid() -> GUID;
+}
+
+impl<'a> Guid for EFIGraphicsOutputProtocol<'a> {
+    fn guid() -> GUID {
+        EFI_GRAPHICS_OUTPUT_PROTOCOL_GUID
+    }
+}
+
+#[repr(C)]
+#[derive(Debug)]
+pub struct EFIGraphicsOutputProtocolMode<'a> {
+    pub max_mode: u32,
+    pub mode: u32,
+    pub info: &'a EFIGraphicsOutputProtocolPixelInfo,
+    pub size_of_info: u64,
+    pub frame_buffer_base: usize,
+    pub frame_buffer_size: usize,
+}
+
+#[repr(C)]
+#[derive(Debug)]
+pub struct EFIGraphicsOutputProtocolPixelInfo {
+    pub version: u32,
+    pub horizontal_resolution: u32,
+    pub vertical_resolution: u32,
+    pub pixel_format: u32,
+    pub red_mask: u32,
+    pub green_mask: u32,
+    pub blue_mask: u32,
+    pub reserved_mask: u32,
+    pub pixels_per_scan_line: u32,
 }

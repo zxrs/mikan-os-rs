@@ -2,11 +2,15 @@
 #![no_main]
 
 use core::fmt::Write;
+use core::slice;
 
 mod x86;
 
 mod uefi;
-use uefi::{EFIHandle, EFISimpleTextOutputProtocolWriter, EFISystemTable, MemoryDescriptorVisitor};
+use uefi::{
+    EFIGraphicsOutputProtocol, EFIHandle, EFISimpleTextOutputProtocolWriter, EFISystemTable,
+    MemoryDescriptorVisitor,
+};
 
 static mut WRITER: Option<EFISimpleTextOutputProtocolWriter<'_>> = None;
 
@@ -53,6 +57,24 @@ fn efi_main(_: EFIHandle, system_table: &'static EFISystemTable) -> ! {
     let visitor = MemoryDescriptorVisitor::new(&memory_map);
     //visitor.take(3).for_each(|d| dbg!(d));
     dbg!(visitor.count());
+
+    let graphics_output = system_table
+        .boot_services
+        .locate_protocol::<EFIGraphicsOutputProtocol>()
+        .unwrap();
+    dbg!(graphics_output.mode.frame_buffer_base);
+    let frame_buffer = unsafe {
+        slice::from_raw_parts_mut(
+            graphics_output.mode.frame_buffer_base as *mut u8,
+            graphics_output.mode.frame_buffer_size as _,
+        )
+    };
+    dbg!(frame_buffer.len());
+    frame_buffer.chunks_exact_mut(4).for_each(|c| {
+        c[0] = 0;
+        c[1] = 255;
+        c[2] = 0;
+    });
 
     loop {
         x86::halt();
