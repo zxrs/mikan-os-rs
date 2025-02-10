@@ -21,6 +21,12 @@ cd loader
 cargo clean
 '''
 
+[tasks.clp]
+script = '''
+cd loader
+cargo clippy
+'''
+
 [tasks.make-image]
 script = '''
 rm -f disk.img

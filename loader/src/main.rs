@@ -4,6 +4,8 @@
 use core::fmt::Write;
 use core::slice;
 
+mod cube;
+
 mod x86;
 
 mod uefi;
@@ -73,25 +75,28 @@ fn efi_main(_: EFIHandle, system_table: &'static EFISystemTable) -> ! {
         )
     };
     dbg!(frame_buffer.len());
+    dbg!(graphics_output.mode.info.vertical_resolution);
+    dbg!(graphics_output.mode.info.horizontal_resolution);
+    dbg!(graphics_output.mode.info.pixels_per_scan_line);
 
-    let event = system_table
-        .boot_services
-        .create_event(EFIEventType(EFIEventType::TIMER), EFITpl(EFITpl::CALLBACK))
-        .unwrap();
-    let events = [event];
-    (0..30).for_each(|i| {
-        system_table
-            .boot_services
-            .set_timer(event, EFITimerDelay::Relative, 10_000_000)
-            .unwrap();
-        system_table.boot_services.wait_for_event(&events).unwrap();
-        frame_buffer.chunks_exact_mut(4).for_each(|c| {
-            c[0] = 0;
-            c[1] = 0;
-            c[2] = 0;
-            c[i % 3] = 255;
-        });
-    });
+    //let event = system_table
+    //    .boot_services
+    //    .create_event(EFIEventType::Timer(), EFITpl::Callback())
+    //    .unwrap();
+    //let events = [event];
+    //(0..30).for_each(|i| {
+    //    system_table
+    //        .boot_services
+    //        .set_timer(event, EFITimerDelay::Relative, 10_000_000)
+    //        .unwrap();
+    //    system_table.boot_services.wait_for_event(&events).unwrap();
+    //    frame_buffer.chunks_exact_mut(4).for_each(|c| {
+    //        c[0] = 0;
+    //        c[1] = 0;
+    //        c[2] = 0;
+    //        c[i % 3] = 255;
+    //    });
+    //});
 
     loop {
         x86::halt();

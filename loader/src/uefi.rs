@@ -10,6 +10,7 @@ pub type EFIHandle = *const u8;
 /// [2.3.1 Data Types](https://uefi.org/specs/UEFI/2.11/02_Overview.html#data-types)
 pub struct EFIStatus(pub usize);
 
+#[allow(clippy::upper_case_acronyms)]
 #[repr(C)]
 pub struct GUID {
     data0: u32,
@@ -53,13 +54,14 @@ pub struct EFITableHeader {
 pub struct CChar(*const u16);
 
 impl CChar {
+    #[allow(dead_code)]
     pub fn from_ptr(ptr: *const u16) -> Self {
         Self(ptr)
     }
 
     pub fn len(&self) -> usize {
         let mut offset = 0;
-        while unsafe { (*self.0.offset(offset as _)).ne(&0) } {
+        while unsafe { (*self.0.add(offset)).ne(&0) } {
             offset += 1;
         }
         offset
@@ -103,7 +105,7 @@ pub struct EFISystemTable<'a> {
 const _: () = {
     use core::mem::offset_of;
     ["size"][size_of::<EFISystemTable>() - 104];
-    ["header"][offset_of!(EFISystemTable, header) - 0];
+    ["header"][offset_of!(EFISystemTable, header)];
     ["vender"][offset_of!(EFISystemTable, firmware_vendor) - 24];
     ["revision"][offset_of!(EFISystemTable, firmware_revision) - 32];
     ["con_in_handle"][offset_of!(EFISystemTable, console_in_handle) - 40];
@@ -148,7 +150,7 @@ impl<'a> EFISimpleTextOutputProtocolWriter<'a> {
     }
 }
 
-impl<'a> fmt::Write for EFISimpleTextOutputProtocolWriter<'a> {
+impl fmt::Write for EFISimpleTextOutputProtocolWriter<'_> {
     fn write_str(&mut self, s: &str) -> fmt::Result {
         s.bytes().try_for_each(|b| -> fmt::Result {
             if b.eq(&b'\n') {
@@ -164,17 +166,36 @@ impl<'a> fmt::Write for EFISimpleTextOutputProtocolWriter<'a> {
 /// [7.1.8. EFI_BOOT_SERVICES.RaiseTPL()](https://uefi.org/specs/UEFI/2.11/07_Services_Boot_Services.html#efi-boot-services-raisetpl)
 #[derive(Debug)]
 #[repr(transparent)]
-pub struct EFITpl(pub usize);
+pub struct EFITpl(usize);
 
+#[allow(dead_code)]
+#[allow(non_snake_case)]
 impl EFITpl {
-    pub const APPLICATION: usize = 4;
-    pub const CALLBACK: usize = 8;
-    pub const NOTIFY: usize = 16;
-    pub const HIGH_LEVEL: usize = 31;
+    const APPLICATION: usize = 4;
+    const CALLBACK: usize = 8;
+    const NOTIFY: usize = 16;
+    const HIGH_LEVEL: usize = 31;
+
+    pub const fn Application() -> Self {
+        Self(Self::APPLICATION)
+    }
+
+    pub const fn Callback() -> Self {
+        Self(Self::CALLBACK)
+    }
+
+    pub const fn Notify() -> Self {
+        Self(Self::NOTIFY)
+    }
+
+    pub const fn HighLevel() -> Self {
+        Self(Self::HIGH_LEVEL)
+    }
 }
 
 pub type EFIEvent = *mut u8;
 
+#[allow(dead_code)]
 #[repr(i32)]
 pub enum EFITimerDelay {
     Cancel = 0,
@@ -183,10 +204,15 @@ pub enum EFITimerDelay {
 }
 
 #[repr(transparent)]
-pub struct EFIEventType(pub u32);
+pub struct EFIEventType(u32);
 
+#[allow(non_snake_case)]
 impl EFIEventType {
-    pub const TIMER: u32 = 0x80000000;
+    const TIMER: u32 = 0x80000000;
+
+    pub const fn Timer() -> Self {
+        Self(Self::TIMER)
+    }
 }
 
 /// [4.4.1. EFI_BOOT_SERVICES](https://uefi.org/specs/UEFI/2.11/04_EFI_System_Table.html#efi-boot-services)
@@ -291,7 +317,7 @@ impl<'a> MemoryDescriptorVisitor<'a> {
     }
 }
 
-impl<'a> Iterator for MemoryDescriptorVisitor<'a> {
+impl Iterator for MemoryDescriptorVisitor<'_> {
     type Item = EFIMemoryDescriptor;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -317,11 +343,11 @@ pub struct EFIGraphicsOutputProtocol<'a> {
     pub mode: &'a EFIGraphicsOutputProtocolMode<'a>,
 }
 
-trait Guid {
+pub trait Guid {
     fn guid() -> GUID;
 }
 
-impl<'a> Guid for EFIGraphicsOutputProtocol<'a> {
+impl Guid for EFIGraphicsOutputProtocol<'_> {
     fn guid() -> GUID {
         EFI_GRAPHICS_OUTPUT_PROTOCOL_GUID
     }
