@@ -8,8 +8,8 @@ mod x86;
 
 mod uefi;
 use uefi::{
-    EFIGraphicsOutputProtocol, EFIHandle, EFISimpleTextOutputProtocolWriter, EFISystemTable,
-    MemoryDescriptorVisitor,
+    EFIEventType, EFIGraphicsOutputProtocol, EFIHandle, EFISimpleTextOutputProtocolWriter,
+    EFISystemTable, EFITimerDelay, EFITpl, MemoryDescriptorVisitor,
 };
 
 static mut WRITER: Option<EFISimpleTextOutputProtocolWriter<'_>> = None;
@@ -33,7 +33,7 @@ macro_rules! dbg {
     () => {{
         println!("[{}:{}]", file!(), line!());
     }};
-    ($arg:expr) => {{
+    ($arg:expr $(,)?) => {{
         println!(
             "[{}:{}] {} = {:#?}",
             file!(),
@@ -42,6 +42,9 @@ macro_rules! dbg {
             $arg
         );
     }};
+    ($($val:expr),+ $(,)?) => {
+        ($(dbg!($val)),+,)
+    };
 }
 
 /// [4.1.1. EFI_IMAGE_ENTRY_POINT](https://uefi.org/specs/UEFI/2.11/04_EFI_System_Table.html#efi-image-entry-point)
@@ -70,10 +73,24 @@ fn efi_main(_: EFIHandle, system_table: &'static EFISystemTable) -> ! {
         )
     };
     dbg!(frame_buffer.len());
-    frame_buffer.chunks_exact_mut(4).for_each(|c| {
-        c[0] = 0;
-        c[1] = 255;
-        c[2] = 0;
+
+    let event = system_table
+        .boot_services
+        .create_event(EFIEventType(EFIEventType::TIMER), EFITpl(EFITpl::CALLBACK))
+        .unwrap();
+    let events = [event];
+    (0..30).for_each(|i| {
+        system_table
+            .boot_services
+            .set_timer(event, EFITimerDelay::Relative, 10_000_000)
+            .unwrap();
+        system_table.boot_services.wait_for_event(&events).unwrap();
+        frame_buffer.chunks_exact_mut(4).for_each(|c| {
+            c[0] = 0;
+            c[1] = 0;
+            c[2] = 0;
+            c[i % 3] = 255;
+        });
     });
 
     loop {

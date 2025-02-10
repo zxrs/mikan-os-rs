@@ -161,6 +161,34 @@ impl<'a> fmt::Write for EFISimpleTextOutputProtocolWriter<'a> {
     }
 }
 
+/// [7.1.8. EFI_BOOT_SERVICES.RaiseTPL()](https://uefi.org/specs/UEFI/2.11/07_Services_Boot_Services.html#efi-boot-services-raisetpl)
+#[derive(Debug)]
+#[repr(transparent)]
+pub struct EFITpl(pub usize);
+
+impl EFITpl {
+    pub const APPLICATION: usize = 4;
+    pub const CALLBACK: usize = 8;
+    pub const NOTIFY: usize = 16;
+    pub const HIGH_LEVEL: usize = 31;
+}
+
+pub type EFIEvent = *mut u8;
+
+#[repr(i32)]
+pub enum EFITimerDelay {
+    Cancel = 0,
+    Periodic = 1,
+    Relative = 2,
+}
+
+#[repr(transparent)]
+pub struct EFIEventType(pub u32);
+
+impl EFIEventType {
+    pub const TIMER: u32 = 0x80000000;
+}
+
 /// [4.4.1. EFI_BOOT_SERVICES](https://uefi.org/specs/UEFI/2.11/04_EFI_System_Table.html#efi-boot-services)
 #[repr(C)]
 pub struct EFIBootServices {
@@ -169,7 +197,11 @@ pub struct EFIBootServices {
     allocate_pages: EFIHandle,
     free_pages: EFIHandle,
     get_memory_map: fn(&mut usize, *mut u8, &mut usize, &mut usize, &mut u32) -> EFIStatus,
-    _padding1: [EFIHandle; 32],
+    _padding1: [EFIHandle; 2],
+    create_event: fn(EFIEventType, EFITpl, *const u8, *const u8, &mut EFIEvent) -> EFIStatus,
+    set_timer: fn(EFIEvent, EFITimerDelay, u64) -> EFIStatus,
+    wait_for_event: fn(usize, &[EFIEvent], &mut usize) -> EFIStatus,
+    _padding2: [EFIHandle; 27],
     /// [7.3.16. EFI_BOOT_SERVICES.LocateProtocol()](https://uefi.org/specs/UEFI/2.11/07_Services_Boot_Services.html#efi-boot-services-locateprotocol)
     locate_protocol: fn(&GUID, *const u8, *mut *mut u8) -> EFIStatus,
 }
@@ -194,6 +226,21 @@ impl EFIBootServices {
         let mut p = ptr::null_mut();
         (self.locate_protocol)(&T::guid(), ptr::null(), &mut p).ok()?;
         Ok(unsafe { &*(p as *mut T) })
+    }
+
+    pub fn create_event(&self, typ: EFIEventType, tpl: EFITpl) -> Result<EFIEvent> {
+        let mut event = ptr::null_mut();
+        (self.create_event)(typ, tpl, ptr::null(), ptr::null(), &mut event).ok()?;
+        Ok(event)
+    }
+
+    pub fn set_timer(&self, event: EFIEvent, typ: EFITimerDelay, delay: u64) -> Result<()> {
+        (self.set_timer)(event, typ, delay).ok()
+    }
+
+    pub fn wait_for_event(&self, events: &[EFIEvent]) -> Result<()> {
+        let mut idx = 0;
+        (self.wait_for_event)(events.len(), events, &mut idx).ok()
     }
 }
 
