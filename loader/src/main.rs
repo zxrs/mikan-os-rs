@@ -6,6 +6,11 @@
 use core::fmt::Write;
 use core::slice;
 
+static mut WRITER: Option<EFISimpleTextOutputProtocolWriter<'_>> = None;
+
+#[macro_use]
+mod macros;
+
 mod cube;
 
 mod x86;
@@ -15,41 +20,6 @@ use uefi::{
     EFIEventType, EFIGraphicsOutputProtocol, EFIHandle, EFISimpleTextOutputProtocolWriter,
     EFISystemTable, EFITimerDelay, EFITpl, MemoryDescriptorVisitor,
 };
-
-static mut WRITER: Option<EFISimpleTextOutputProtocolWriter<'_>> = None;
-
-macro_rules! print {
-    ($($args:tt)*) => {{
-        #[allow(static_mut_refs)]
-        if let Some(writer) = unsafe { WRITER.as_mut() } {
-            write!(writer, "{}", format_args!($($args)*)).unwrap();
-        }
-    }};
-}
-
-macro_rules! println {
-    ($($args:tt)*) => {{
-        print!("{}\n", format_args!($($args)*));
-    }};
-}
-
-macro_rules! dbg {
-    () => {{
-        println!("[{}:{}]", file!(), line!());
-    }};
-    ($arg:expr $(,)?) => {{
-        println!(
-            "[{}:{}] {} = {:#?}",
-            file!(),
-            line!(),
-            stringify!($arg),
-            $arg
-        );
-    }};
-    ($($val:expr),+ $(,)?) => {
-        ($(dbg!($val)),+,)
-    };
-}
 
 /// [4.1.1. EFI_IMAGE_ENTRY_POINT](https://uefi.org/specs/UEFI/2.11/04_EFI_System_Table.html#efi-image-entry-point)
 #[unsafe(no_mangle)]
