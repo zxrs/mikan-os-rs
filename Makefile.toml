@@ -1,6 +1,11 @@
 # `cargo make launch` for debug build
 # `cargo make --profile prod launch` for release build
 
+[tasks.nvim]
+script = '''
+nvim -p loader/src/main.rs loader/src/uefi.rs
+'''
+
 [tasks.loader]
 condition = { env = { "MODE" = "debug" } }
 script = '''
