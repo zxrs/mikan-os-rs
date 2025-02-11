@@ -21,10 +21,10 @@ cd loader
 cargo clean
 '''
 
-[tasks.clp]
+[tasks.ovmf]
 script = '''
-cd loader
-cargo clippy
+curl -L https://github.com/uchan-nos/mikanos-build/raw/refs/tags/v2.0/devenv/OVMF_CODE.fd -o ovmf/OVMF_CODE.fd
+curl -L https://github.com/uchan-nos/mikanos-build/raw/refs/tags/v2.0/devenv/OVMF_VARS.fd -o ovmf/OVMF_VARS.fd
 '''
 
 [tasks.make-image]

@@ -1,3 +1,5 @@
+#![allow(internal_features)]
+#![feature(core_intrinsics)]
 #![no_std]
 #![no_main]
 
@@ -78,6 +80,8 @@ fn efi_main(_: EFIHandle, system_table: &'static EFISystemTable) -> ! {
     dbg!(graphics_output.mode.info.vertical_resolution);
     dbg!(graphics_output.mode.info.horizontal_resolution);
     dbg!(graphics_output.mode.info.pixels_per_scan_line);
+
+    cube::rotate(system_table, frame_buffer);
 
     //let event = system_table
     //    .boot_services
