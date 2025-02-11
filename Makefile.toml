@@ -3,7 +3,7 @@
 
 [tasks.nvim]
 script = '''
-nvim -p loader/src/main.rs loader/src/uefi.rs
+nvim loader/src/main.rs loader/src/uefi.rs
 '''
 
 [tasks.loader]
