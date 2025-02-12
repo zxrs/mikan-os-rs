@@ -160,15 +160,10 @@ pub fn rotate<'a>(system_table: &'a EFISystemTable, frame_buffer: &mut [u8]) -> 
 
         frame_buffer
             .chunks_exact_mut(800 * 4)
-            .zip(buffer.chunks(WIDTH))
+            .zip(buffer.chunks(WIDTH).map(|c| c.as_flattened()))
             .for_each(|(dst, src)| {
-                unsafe {
-                    core::ptr::copy_nonoverlapping(
-                        src.as_ptr() as *const u8,
-                        dst.as_mut_ptr(),
-                        WIDTH * 4,
-                    );
-                };
+                let (dst, _) = dst.split_at_mut(WIDTH * 4);
+                dst.copy_from_slice(src)
             });
 
         system_table

@@ -6,6 +6,11 @@ script = '''
 nvim loader/src/main.rs loader/src/uefi.rs
 '''
 
+[tasks.hx]
+script = '''
+hx loader/src/main.rs loader/src/uefi.rs
+'''
+
 [tasks.loader]
 condition = { env = { "MODE" = "debug" } }
 script = '''
