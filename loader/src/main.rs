@@ -99,6 +99,18 @@ fn efi_main(image_handle: EFIHandle, system_table: &'static EFISystemTable) -> !
         .read(kernel_file_size as usize, kernel_base_address as usize)
         .unwrap();
 
+    if system_table
+        .boot_services
+        .exit_boot_services(image_handle, memory_map.map_key)
+        .is_err()
+    {
+        let memory_map = system_table.boot_services.get_memory_map().unwrap();
+        system_table
+            .boot_services
+            .exit_boot_services(image_handle, memory_map.map_key)
+            .unwrap();
+    }
+
     // cube::rotate(system_table, frame_buffer);
 
     //let event = system_table

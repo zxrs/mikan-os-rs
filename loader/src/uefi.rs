@@ -286,16 +286,20 @@ pub struct EFIBootServices {
     create_event: fn(EFIEventType, EFITpl, *const u8, *const u8, &mut EFIEvent) -> EFIStatus,
     set_timer: fn(EFIEvent, EFITimerDelay, u64) -> EFIStatus,
     wait_for_event: fn(usize, &[EFIEvent], &mut usize) -> EFIStatus,
-    _padding2: [EFIHandle; 22],
+    _padding2: [EFIHandle; 16],
+    /// [7.4.6. EFI_BOOT_SERVICES.ExitBootServices()](https://uefi.org/specs/UEFI/2.11/07_Services_Boot_Services.html#efi-boot-services-exitbootservices)
+    exit_boot_services: fn(EFIHandle, usize) -> EFIStatus,
+    _padding3: [EFIHandle; 5],
     /// [7.3.9. EFI_BOOT_SERVICES.OpenProtocol()](https://uefi.org/specs/UEFI/2.11/07_Services_Boot_Services.html#efi-boot-services-openprotocol)
     open_protocol: fn(EFIHandle, &GUID, *mut *mut u8, EFIHandle, EFIHandle, u32) -> EFIStatus,
-    _padding3: [EFIHandle; 4],
+    _padding4: [EFIHandle; 4],
     /// [7.3.16. EFI_BOOT_SERVICES.LocateProtocol()](https://uefi.org/specs/UEFI/2.11/07_Services_Boot_Services.html#efi-boot-services-locateprotocol)
     locate_protocol: fn(&GUID, *const u8, *mut *mut u8) -> EFIStatus,
 }
 
 const _: () = {
     use core::mem::offset_of;
+    ["exit_boot_services"][offset_of!(EFIBootServices, exit_boot_services) - 232];
     ["open_protocol"][offset_of!(EFIBootServices, open_protocol) - 280];
     ["locate_protocol"][offset_of!(EFIBootServices, locate_protocol) - 320];
 };
@@ -330,6 +334,25 @@ impl EFIBootServices {
         Ok(memory_map)
     }
 
+    pub fn create_event(&self, typ: EFIEventType, tpl: EFITpl) -> Result<EFIEvent> {
+        let mut event = ptr::null_mut();
+        (self.create_event)(typ, tpl, ptr::null(), ptr::null(), &mut event).ok()?;
+        Ok(event)
+    }
+
+    pub fn set_timer(&self, event: EFIEvent, typ: EFITimerDelay, delay: u64) -> Result<()> {
+        (self.set_timer)(event, typ, delay).ok()
+    }
+
+    pub fn wait_for_event(&self, events: &[EFIEvent]) -> Result<()> {
+        let mut idx = 0;
+        (self.wait_for_event)(events.len(), events, &mut idx).ok()
+    }
+
+    pub fn exit_boot_services(&self, image_handle: EFIHandle, map_key: usize) -> Result<()> {
+        (self.exit_boot_services)(image_handle, map_key).ok()
+    }
+
     pub fn locate_protocol<'a, T: Guid>(&self) -> Result<&'a T> {
         let mut p = ptr::null_mut();
         (self.locate_protocol)(&T::guid(), ptr::null(), &mut p).ok()?;
@@ -352,21 +375,6 @@ impl EFIBootServices {
         )
         .ok()?;
         Ok(unsafe { &*(p as *mut T) })
-    }
-
-    pub fn create_event(&self, typ: EFIEventType, tpl: EFITpl) -> Result<EFIEvent> {
-        let mut event = ptr::null_mut();
-        (self.create_event)(typ, tpl, ptr::null(), ptr::null(), &mut event).ok()?;
-        Ok(event)
-    }
-
-    pub fn set_timer(&self, event: EFIEvent, typ: EFITimerDelay, delay: u64) -> Result<()> {
-        (self.set_timer)(event, typ, delay).ok()
-    }
-
-    pub fn wait_for_event(&self, events: &[EFIEvent]) -> Result<()> {
-        let mut idx = 0;
-        (self.wait_for_event)(events.len(), events, &mut idx).ok()
     }
 }
 
