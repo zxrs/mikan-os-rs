@@ -230,7 +230,7 @@ pub enum EFITimerDelay {
 #[repr(transparent)]
 pub struct EFIEventType(u32);
 
-#[allow(non_snake_case)]
+#[allow(non_snake_case, unused)]
 impl EFIEventType {
     const TIMER: u32 = 0x80000000;
 
@@ -239,6 +239,7 @@ impl EFIEventType {
     }
 }
 
+#[allow(unused)]
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub enum EFIAllocateType {
@@ -248,6 +249,7 @@ pub enum EFIAllocateType {
     MaxAllocateType,
 }
 
+#[allow(unused)]
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub enum EFIMemoryType {
@@ -276,25 +278,38 @@ pub type EFIPhysicalAddress = u64;
 #[repr(C)]
 pub struct EFIBootServices {
     header: EFITableHeader,
+    #[doc(hidden)]
     _padding0: [EFIHandle; 2],
     /// [7.2.1. EFI_BOOT_SERVICES.AllocatePages()](https://uefi.org/specs/UEFI/2.11/07_Services_Boot_Services.html#efi-boot-services-allocatepages)
     allocate_pages: fn(EFIAllocateType, EFIMemoryType, usize, *mut EFIPhysicalAddress) -> EFIStatus,
     free_pages: EFIHandle,
     /// [7.2.3. EFI_BOOT_SERVICES.GetMemoryMap()](https://uefi.org/specs/UEFI/2.11/07_Services_Boot_Services.html#efi-boot-services-getmemorymap)
     get_memory_map: fn(&mut usize, *mut u8, &mut usize, &mut usize, &mut u32) -> EFIStatus,
-    _padding1: [EFIHandle; 2],
+    /// [7.2.4. EFI_BOOT_SERVICES.AllocatePool()](https://uefi.org/specs/UEFI/2.11/07_Services_Boot_Services.html#efi-boot-services-allocatepool)
+    allocate_pool: fn(EFIMemoryType, usize, *mut *mut u8) -> EFIStatus,
+    #[doc(hidden)]
+    _padding1: EFIHandle,
     create_event: fn(EFIEventType, EFITpl, *const u8, *const u8, &mut EFIEvent) -> EFIStatus,
     set_timer: fn(EFIEvent, EFITimerDelay, u64) -> EFIStatus,
     wait_for_event: fn(usize, &[EFIEvent], &mut usize) -> EFIStatus,
+    #[doc(hidden)]
     _padding2: [EFIHandle; 16],
     /// [7.4.6. EFI_BOOT_SERVICES.ExitBootServices()](https://uefi.org/specs/UEFI/2.11/07_Services_Boot_Services.html#efi-boot-services-exitbootservices)
     exit_boot_services: fn(EFIHandle, usize) -> EFIStatus,
+    #[doc(hidden)]
     _padding3: [EFIHandle; 5],
     /// [7.3.9. EFI_BOOT_SERVICES.OpenProtocol()](https://uefi.org/specs/UEFI/2.11/07_Services_Boot_Services.html#efi-boot-services-openprotocol)
     open_protocol: fn(EFIHandle, &GUID, *mut *mut u8, EFIHandle, EFIHandle, u32) -> EFIStatus,
+    #[doc(hidden)]
     _padding4: [EFIHandle; 4],
     /// [7.3.16. EFI_BOOT_SERVICES.LocateProtocol()](https://uefi.org/specs/UEFI/2.11/07_Services_Boot_Services.html#efi-boot-services-locateprotocol)
     locate_protocol: fn(&GUID, *const u8, *mut *mut u8) -> EFIStatus,
+    #[doc(hidden)]
+    _padding5: [EFIHandle; 3],
+    /// [7.5.3. EFI_BOOT_SERVICES.CopyMem()](https://uefi.org/specs/UEFI/2.11/07_Services_Boot_Services.html#efi-boot-services-copymem)
+    pub copy_mem: fn(*mut u8, *const u8, usize) -> EFIStatus,
+    /// [7.5.4. EFI_BOOT_SERVICES.SetMem()](https://uefi.org/specs/UEFI/2.11/07_Services_Boot_Services.html#efi-boot-services-setmem)
+    pub set_mem: fn(*const u8, usize, u8) -> EFIStatus,
 }
 
 const _: () = {
@@ -304,12 +319,12 @@ const _: () = {
     ["locate_protocol"][offset_of!(EFIBootServices, locate_protocol) - 320];
 };
 
-const MEMORY_MAP_SIZE: usize = 4096 * 2;
+const MEMORY_MAP_SIZE: usize = 4096 * 4;
 
 impl EFIBootServices {
     const EFI_OPEN_PROTOCOL_BY_HANDLE_PROTOCOL: u32 = 0x00000001;
 
-    pub fn allocate_pages<'a>(
+    pub fn allocate_pages(
         &self,
         typ: EFIAllocateType,
         memory_type: EFIMemoryType,
@@ -334,16 +349,26 @@ impl EFIBootServices {
         Ok(memory_map)
     }
 
+    pub fn allocate_pool(&self, typ: EFIMemoryType, size: usize) -> Result<&[u8]> {
+        let mut p = ptr::null_mut();
+        (self.allocate_pool)(typ, size, &mut p).ok()?;
+        let slice = unsafe { core::slice::from_raw_parts(p, size) };
+        Ok(slice)
+    }
+
+    #[allow(unused)]
     pub fn create_event(&self, typ: EFIEventType, tpl: EFITpl) -> Result<EFIEvent> {
         let mut event = ptr::null_mut();
         (self.create_event)(typ, tpl, ptr::null(), ptr::null(), &mut event).ok()?;
         Ok(event)
     }
 
+    #[allow(unused)]
     pub fn set_timer(&self, event: EFIEvent, typ: EFITimerDelay, delay: u64) -> Result<()> {
         (self.set_timer)(event, typ, delay).ok()
     }
 
+    #[allow(unused)]
     pub fn wait_for_event(&self, events: &[EFIEvent]) -> Result<()> {
         let mut idx = 0;
         (self.wait_for_event)(events.len(), events, &mut idx).ok()
@@ -376,6 +401,14 @@ impl EFIBootServices {
         .ok()?;
         Ok(unsafe { &*(p as *mut T) })
     }
+
+    // pub fn copy_mem(&self, dst: &mut [u8], src: &[u8]) -> Result<()> {
+    //     (self.copy_mem)(dst.as_mut_ptr(), src.as_ptr(), src.len()).ok()
+    // }
+
+    // pub fn set_mem(&self, buffer: &mut [u8], value: u8) -> Result<()> {
+    //     (self.set_mem)(buffer.as_mut_ptr(), buffer.len(), value).ok()
+    // }
 }
 
 /// [7.2.3. EFI_BOOT_SERVICES.GetMemoryMap()](https://uefi.org/specs/UEFI/2.11/07_Services_Boot_Services.html#efi-boot-services-getmemorymap)
@@ -447,6 +480,7 @@ impl Iterator for MemoryDescriptorVisitor<'_> {
 /// [12.9.2. EFI_GRAPHICS_OUTPUT_PROTOCOL](https://uefi.org/specs/UEFI/2.11/12_Protocols_Console_Support.html#efi-graphics-output-protocol)
 #[repr(C)]
 pub struct EFIGraphicsOutputProtocol<'a> {
+    #[doc(hidden)]
     _padding: [EFIHandle; 3],
     pub mode: &'a EFIGraphicsOutputProtocolMode<'a>,
 }
@@ -489,7 +523,7 @@ pub struct EFIGraphicsOutputProtocolPixelInfo {
 #[repr(transparent)]
 pub struct FileMode(u64);
 
-#[allow(non_snake_case)]
+#[allow(non_snake_case, unused)]
 impl FileMode {
     const READ: u64 = 0x1;
     const WRITE: u64 = 0x2;
@@ -509,9 +543,10 @@ impl FileMode {
 }
 
 #[repr(transparent)]
+#[derive(Debug, Default)]
 pub struct FileAttributes(u64);
 
-#[allow(non_snake_case)]
+#[allow(non_snake_case, unused)]
 impl FileAttributes {
     const READ_ONLY: u64 = 0x1;
     const HIDDEN: u64 = 0x2;
@@ -561,6 +596,7 @@ pub struct EFIFileProtocol {
     delete: EFIHandle,
     /// [13.5.5. EFI_FILE_PROTOCOL.Read()](https://uefi.org/specs/UEFI/2.11/13_Protocols_Media_Access.html#id28)
     read: fn(*const EFIFileProtocol, *mut usize, *mut usize) -> EFIStatus,
+    #[doc(hidden)]
     _padding0: [EFIHandle; 3],
     /// [13.5.13. EFI_FILE_PROTOCOL.GetInfo()](https://uefi.org/specs/UEFI/2.11/13_Protocols_Media_Access.html#efi-file-protocol-getinfo)
     get_info: fn(*const EFIFileProtocol, &GUID, *mut usize, *mut u8) -> EFIStatus,
@@ -668,9 +704,11 @@ pub struct EFITime {
     pub hour: u8,   // 0 - 23
     pub minute: u8, // 0 - 59
     pub second: u8, // 0 - 59
+    #[doc(hidden)]
     _pad0: u8,
     pub nano_sec: u32,  // 0 - 999_999_999
     pub time_zone: i32, // -1440 - 1440 or 2047
     pub day_light: u8,
+    #[doc(hidden)]
     _pad1: u8,
 }

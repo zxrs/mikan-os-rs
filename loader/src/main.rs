@@ -5,17 +5,17 @@
 
 use core::fmt::Write;
 use core::slice;
+use utf16_lit::utf16_null as w;
 
 static mut WRITER: Option<EFISimpleTextOutputProtocolWriter<'_>> = None;
 
 #[macro_use]
 mod macros;
-
-mod cube;
-
-mod x86;
-
+//mod cube;
+mod elf;
+use elf::{Elf64_Ehdr, calc_load_address_range, copy_load_segments};
 mod uefi;
+mod x86;
 use uefi::{
     CChar, EFIAllocateType, EFIEventType, EFIFileInfo, EFIGraphicsOutputProtocol, EFIHandle,
     EFILoadedImageProtocol, EFIMemoryType, EFISimpleFileSystemProtocol,
@@ -65,14 +65,12 @@ fn efi_main(image_handle: EFIHandle, system_table: &'static EFISystemTable) -> !
 
     let root_dir = fs.open_volume().unwrap();
 
-    let file_name = [
-        b'k', b'\0', b'e', b'\0', b'r', b'\0', b'n', b'\0', b'e', b'\0', b'l', b'\0', b'.', b'\0',
-        b'e', b'\0', b'l', b'\0', b'f', b'\0', b'\0', b'\0',
-    ];
-    let file_name = CChar::from_ptr(file_name.as_ptr() as *const u16);
-
     let kernel_file = root_dir
-        .open(file_name, FileMode::Read(), FileAttributes::ReadOnly())
+        .open(
+            CChar::from_ptr(w!("kernel.elf").as_ptr()),
+            FileMode::Read(),
+            FileAttributes::default(),
+        )
         .unwrap();
 
     let mut file_info_buffer = [0; size_of::<EFIFileInfo>() + size_of::<u16>() * 12];
@@ -82,22 +80,36 @@ fn efi_main(image_handle: EFIHandle, system_table: &'static EFISystemTable) -> !
     let kernel_file_size = file_info.file_size;
     dbg!(kernel_file_size);
 
-    let kernel_base_address = 0x100_000;
+    let kernel_buffer = system_table
+        .boot_services
+        .allocate_pool(EFIMemoryType::LoaderData, kernel_file_size as usize)
+        .unwrap();
+
+    kernel_file
+        .read(kernel_file_size as usize, kernel_buffer.as_ptr().addr())
+        .unwrap();
+
+    let kernel_ehdr = unsafe { &*(kernel_buffer.as_ptr() as *const Elf64_Ehdr) };
+
+    let (first, last) = calc_load_address_range(kernel_ehdr);
+
+    let num_pages = (last - first).div_ceil(0x1000);
+
     let kernel_base_address = system_table
         .boot_services
         .allocate_pages(
             EFIAllocateType::AllocateAddress,
             EFIMemoryType::LoaderData,
-            (kernel_file_size as usize + 0xffff) / 0x1000,
-            kernel_base_address,
+            num_pages as usize,
+            first,
         )
         .unwrap();
 
     println!("kernel_base_address: 0x{:08x?}", kernel_base_address);
 
-    let kernel = kernel_file
-        .read(kernel_file_size as usize, kernel_base_address as usize)
-        .unwrap();
+    copy_load_segments(system_table, kernel_ehdr).unwrap();
+
+    dbg!(kernel_ehdr.entry_addr());
 
     if system_table
         .boot_services
@@ -111,30 +123,16 @@ fn efi_main(image_handle: EFIHandle, system_table: &'static EFISystemTable) -> !
             .unwrap();
     }
 
+    let entry_point = unsafe {
+        core::mem::transmute::<*const u8, extern "sysv64" fn(*const u8, usize)>(
+            kernel_ehdr.entry_addr() as *const u8,
+        )
+    };
+    entry_point(frame_buffer.as_ptr(), frame_buffer.len());
+
     // cube::rotate(system_table, frame_buffer);
 
-    //let event = system_table
-    //    .boot_services
-    //    .create_event(EFIEventType::Timer(), EFITpl::Callback())
-    //    .unwrap();
-    //let events = [event];
-    //(0..30).for_each(|i| {
-    //    system_table
-    //        .boot_services
-    //        .set_timer(event, EFITimerDelay::Relative, 10_000_000)
-    //        .unwrap();
-    //    system_table.boot_services.wait_for_event(&events).unwrap();
-    //    frame_buffer.chunks_exact_mut(4).for_each(|c| {
-    //        c[0] = 0;
-    //        c[1] = 0;
-    //        c[2] = 0;
-    //        c[i % 3] = 255;
-    //    });
-    //});
-
-    loop {
-        x86::halt();
-    }
+    unreachable!();
 }
 
 #[panic_handler]

@@ -50,6 +50,8 @@ cargo build --release
 script = '''
 cd loader
 cargo clean
+cd ../kernel
+cargo clean
 '''
 
 [tasks.ovmf]
@@ -71,14 +73,15 @@ sudo cp kernel/target/x86_64-unknown-none/${MODE}/kernel mnt/kernel.elf
 sleep 1
 sudo umount mnt
 '''
-dependencies = ["loader-release", "loader"]
+dependencies = ["loader-release", "loader", "kernel-release", "kernel"]
 
 [tasks.launch]
 script = '''
 qemu-system-x86_64 \
     -drive if=pflash,format=raw,file=./ovmf/OVMF_CODE.fd \
     -drive if=pflash,format=raw,file=./ovmf/OVMF_VARS.fd \
-    -drive if=ide,index=0,media=disk,format=raw,file=disk.img
+    -drive if=ide,index=0,media=disk,format=raw,file=disk.img \
+    -monitor stdio
 '''
 dependencies = ["make-image"]
 
