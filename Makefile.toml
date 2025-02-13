@@ -1,14 +1,13 @@
 # `cargo make launch` for debug build
 # `cargo make --profile prod launch` for release build
 
-[tasks.nvim]
-script = '''
-nvim loader/src/main.rs loader/src/uefi.rs
-'''
-
-[tasks.hx]
+[tasks.editloader]
 script = '''
 hx loader/src/main.rs loader/src/uefi.rs
+'''
+[tasks.editkernel]
+script = '''
+hx kernel/src/main.rs
 '''
 
 [tasks.loader]
@@ -18,10 +17,24 @@ cd loader
 cargo build
 '''
 
+[tasks.kernel]
+condition = { env = { "MODE" = "debug" } }
+script = '''
+cd kernel
+cargo build
+'''
+
 [tasks.loader-release]
 condition = { env = { "MODE" = "release" } }
 script = '''
 cd loader
+cargo build --release
+'''
+
+[tasks.kernel-release]
+condition = { env = { "MODE" = "release" } }
+script = '''
+cd kernel
 cargo build --release
 '''
 

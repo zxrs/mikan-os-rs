@@ -17,13 +17,14 @@ mod x86;
 
 mod uefi;
 use uefi::{
-    EFIEventType, EFIGraphicsOutputProtocol, EFIHandle, EFISimpleTextOutputProtocolWriter,
-    EFISystemTable, EFITimerDelay, EFITpl, MemoryDescriptorVisitor,
+    EFIEventType, EFIGraphicsOutputProtocol, EFIHandle, EFILoadedImageProtocol,
+    EFISimpleFileSystemProtocol, EFISimpleTextOutputProtocolWriter, EFISystemTable, EFITimerDelay,
+    EFITpl, MemoryDescriptorVisitor,
 };
 
 /// [4.1.1. EFI_IMAGE_ENTRY_POINT](https://uefi.org/specs/UEFI/2.11/04_EFI_System_Table.html#efi-image-entry-point)
 #[unsafe(no_mangle)]
-fn efi_main(_: EFIHandle, system_table: &'static EFISystemTable) -> ! {
+fn efi_main(image_handle: EFIHandle, system_table: &'static EFISystemTable) -> ! {
     system_table.con_out.clear_screen();
     unsafe { WRITER = Some(EFISimpleTextOutputProtocolWriter::new(system_table.con_out)) };
     println!("{}", system_table.firmware_vendor);
@@ -51,7 +52,19 @@ fn efi_main(_: EFIHandle, system_table: &'static EFISystemTable) -> ! {
     dbg!(graphics_output.mode.info.horizontal_resolution);
     dbg!(graphics_output.mode.info.pixels_per_scan_line);
 
-    cube::rotate(system_table, frame_buffer);
+    let loaded_image = system_table
+        .boot_services
+        .open_protocol::<EFILoadedImageProtocol>(image_handle, image_handle)
+        .unwrap();
+
+    let fs = system_table
+        .boot_services
+        .open_protocol::<EFISimpleFileSystemProtocol>(loaded_image.device_handle(), image_handle)
+        .unwrap();
+
+    let root_dir = fs.open_volume().unwrap();
+
+    // cube::rotate(system_table, frame_buffer);
 
     //let event = system_table
     //    .boot_services

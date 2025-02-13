@@ -23,3 +23,5 @@ Cargo.lock
 loader/target
 ovmf/
 disk.img
+
+kernel/target

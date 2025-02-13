@@ -27,6 +27,22 @@ const EFI_GRAPHICS_OUTPUT_PROTOCOL_GUID: GUID = GUID {
     data3: [0x96, 0xfb, 0x7a, 0xde, 0xd0, 0x80, 0x51, 0x6a],
 };
 
+/// [9.1.1. EFI_LOADED_IMAGE_PROTOCOL](https://uefi.org/specs/UEFI/2.11/09_Protocols_EFI_Loaded_Image.html#id3)
+const EFI_LOADED_IMAGE_PROTOCOL_GUID: GUID = GUID {
+    data0: 0x5b1b31a1,
+    data1: 0x9562,
+    data2: 0x11d2,
+    data3: [0x8e, 0x3f, 0x00, 0xa0, 0xc9, 0x69, 0x72, 0x3b],
+};
+
+/// [13.4.1. EFI_SIMPLE_FILE_SYSTEM_PROTOCOL](https://uefi.org/specs/UEFI/2.11/13_Protocols_Media_Access.html#efi-simple-file-system-protocol)
+const EFI_SIMPLE_FILE_SYSTEM_PROTOCOL_GUID: GUID = GUID {
+    data0: 0x0964e5b22,
+    data1: 0x6459,
+    data2: 0x11d2,
+    data3: [0x8e, 0x39, 0x00, 0xa0, 0xc9, 0x69, 0x72, 0x3b],
+};
+
 impl EFIStatus {
     pub fn is_success(&self) -> bool {
         self.0.eq(&0)
@@ -227,14 +243,23 @@ pub struct EFIBootServices {
     create_event: fn(EFIEventType, EFITpl, *const u8, *const u8, &mut EFIEvent) -> EFIStatus,
     set_timer: fn(EFIEvent, EFITimerDelay, u64) -> EFIStatus,
     wait_for_event: fn(usize, &[EFIEvent], &mut usize) -> EFIStatus,
-    _padding2: [EFIHandle; 27],
-    /// [7.3.16. EFI_BOOT_SERVICES.LocateProtocol()](https://uefi.org/specs/UEFI/2.11/07_Services_Boot_Services.html#efi-boot-services-locateprotocol)
+    _padding2: [EFIHandle; 22],
+    open_protocol: fn(EFIHandle, &GUID, *mut *mut u8, EFIHandle, EFIHandle, u32) -> EFIStatus,
+    _padding3: [EFIHandle; 4],
     locate_protocol: fn(&GUID, *const u8, *mut *mut u8) -> EFIStatus,
 }
+
+const _: () = {
+    use core::mem::offset_of;
+    ["open_protocol"][offset_of!(EFIBootServices, open_protocol) - 280];
+    ["locate_protocol"][offset_of!(EFIBootServices, locate_protocol) - 320];
+};
 
 const MEMORY_MAP_SIZE: usize = 4096 * 2;
 
 impl EFIBootServices {
+    const EFI_OPEN_PROTOCOL_BY_HANDLE_PROTOCOL: u32 = 0x00000001;
+
     pub fn get_memory_map(&self) -> Result<MemoryMap> {
         let mut memory_map = MemoryMap::default();
         (self.get_memory_map)(
@@ -248,9 +273,29 @@ impl EFIBootServices {
         Ok(memory_map)
     }
 
+    /// [7.3.16. EFI_BOOT_SERVICES.LocateProtocol()](https://uefi.org/specs/UEFI/2.11/07_Services_Boot_Services.html#efi-boot-services-locateprotocol)
     pub fn locate_protocol<'a, T: Guid>(&self) -> Result<&'a T> {
         let mut p = ptr::null_mut();
         (self.locate_protocol)(&T::guid(), ptr::null(), &mut p).ok()?;
+        Ok(unsafe { &*(p as *mut T) })
+    }
+
+    /// [7.3.9. EFI_BOOT_SERVICES.OpenProtocol()](https://uefi.org/specs/UEFI/2.11/07_Services_Boot_Services.html#efi-boot-services-openprotocol)
+    pub fn open_protocol<'a, T: Guid>(
+        &self,
+        handle: EFIHandle,
+        agent_handle: EFIHandle,
+    ) -> Result<&'a T> {
+        let mut p = ptr::null_mut();
+        (self.open_protocol)(
+            handle,
+            &T::guid(),
+            &mut p,
+            agent_handle,
+            ptr::null(),
+            Self::EFI_OPEN_PROTOCOL_BY_HANDLE_PROTOCOL,
+        )
+        .ok()?;
         Ok(unsafe { &*(p as *mut T) })
     }
 
@@ -376,4 +421,55 @@ pub struct EFIGraphicsOutputProtocolPixelInfo {
     pub blue_mask: u32,
     pub reserved_mask: u32,
     pub pixels_per_scan_line: u32,
+}
+
+/// [13.5.1. EFI_FILE_PROTOCOL](https://uefi.org/specs/UEFI/2.11/13_Protocols_Media_Access.html#efi-file-protocol)
+#[repr(C)]
+#[derive(Debug)]
+pub struct EFIFileProtocol {
+    revision: u64,
+    open: fn(*const EFIFileProtocol, *mut *mut EFIFileProtocol, CChar, u64, u64) -> EFIStatus,
+}
+
+/// [9.1.1. EFI_LOADED_IMAGE_PROTOCOL](https://uefi.org/specs/UEFI/2.11/09_Protocols_EFI_Loaded_Image.html#id3)
+#[repr(C)]
+pub struct EFILoadedImageProtocol<'a> {
+    revision: u32,
+    parent_handle: EFIHandle,
+    system_table: &'a EFISystemTable<'a>,
+    device_handle: EFIHandle,
+}
+
+impl EFILoadedImageProtocol<'_> {
+    pub fn device_handle(&self) -> EFIHandle {
+        self.device_handle
+    }
+}
+
+impl Guid for EFILoadedImageProtocol<'_> {
+    fn guid() -> GUID {
+        EFI_LOADED_IMAGE_PROTOCOL_GUID
+    }
+}
+
+/// [13.4.1. EFI_SIMPLE_FILE_SYSTEM_PROTOCOL](https://uefi.org/specs/UEFI/2.11/13_Protocols_Media_Access.html#efi-simple-file-system-protocol)
+#[repr(C)]
+#[derive(Debug)]
+pub struct EFISimpleFileSystemProtocol {
+    revision: u64,
+    open_volume: fn(*const EFISimpleFileSystemProtocol, *mut *mut EFIFileProtocol) -> EFIStatus,
+}
+
+impl EFISimpleFileSystemProtocol {
+    pub fn open_volume(&self) -> Result<&EFIFileProtocol> {
+        let mut p = ptr::null_mut();
+        (self.open_volume)(self, &mut p).ok()?;
+        Ok(unsafe { &*p })
+    }
+}
+
+impl Guid for EFISimpleFileSystemProtocol {
+    fn guid() -> GUID {
+        EFI_SIMPLE_FILE_SYSTEM_PROTOCOL_GUID
+    }
 }

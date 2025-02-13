@@ -1,0 +1,15 @@
+[unstable]
+build-std = ["core"]
+build-std-features = ["compiler-builtins-mem"]
+
+[build]
+target = "x86_64-unknown-none"
+rustflags = [
+  "-Crelocation-model=static",
+  "-Cno-redzone=yes",
+  "-Clink-arg=--entry=kernel_main",
+  "-Clink-arg=--image-base=0x100000",
+  "-Clink-arg=-nmagic",
+  "-Clink-arg=-znorelro",
+  "-Clink-arg=--static",
+]
