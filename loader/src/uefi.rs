@@ -43,6 +43,14 @@ const EFI_SIMPLE_FILE_SYSTEM_PROTOCOL_GUID: GUID = GUID {
     data3: [0x8e, 0x39, 0x00, 0xa0, 0xc9, 0x69, 0x72, 0x3b],
 };
 
+/// [13.5.16. EFI_FILE_INFO](https://uefi.org/specs/UEFI/2.11/13_Protocols_Media_Access.html#efi-file-info)
+const EFI_FILE_INFO_GUID: GUID = GUID {
+    data0: 0x09576e92,
+    data1: 0x6d3f,
+    data2: 0x11d2,
+    data3: [0x8e, 0x39, 0x00, 0xa0, 0xc9, 0x69, 0x72, 0x3b],
+};
+
 impl EFIStatus {
     pub fn is_success(&self) -> bool {
         self.0.eq(&0)
@@ -231,21 +239,58 @@ impl EFIEventType {
     }
 }
 
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub enum EFIAllocateType {
+    AllocateAnyPages = 0,
+    AllocateMaxAddress,
+    AllocateAddress,
+    MaxAllocateType,
+}
+
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub enum EFIMemoryType {
+    ReservedMemoryType = 0,
+    LoaderCode,
+    LoaderData,
+    BootServicesCode,
+    BootServicesData,
+    RuntimeServicesCode,
+    RuntimeServicesData,
+    ConventionalMemory,
+    UnusableMemory,
+    ACPIReclaimMemory,
+    ACPIMemoryNVS,
+    MemoryMappedIO,
+    MemoryMappedIOPortSpace,
+    PalCode,
+    PersistentMemory,
+    UnacceptedMemoryType,
+    MaxMemoryType,
+}
+
+pub type EFIPhysicalAddress = u64;
+
 /// [4.4.1. EFI_BOOT_SERVICES](https://uefi.org/specs/UEFI/2.11/04_EFI_System_Table.html#efi-boot-services)
 #[repr(C)]
 pub struct EFIBootServices {
     header: EFITableHeader,
     _padding0: [EFIHandle; 2],
-    allocate_pages: EFIHandle,
+    /// [7.2.1. EFI_BOOT_SERVICES.AllocatePages()](https://uefi.org/specs/UEFI/2.11/07_Services_Boot_Services.html#efi-boot-services-allocatepages)
+    allocate_pages: fn(EFIAllocateType, EFIMemoryType, usize, *mut EFIPhysicalAddress) -> EFIStatus,
     free_pages: EFIHandle,
+    /// [7.2.3. EFI_BOOT_SERVICES.GetMemoryMap()](https://uefi.org/specs/UEFI/2.11/07_Services_Boot_Services.html#efi-boot-services-getmemorymap)
     get_memory_map: fn(&mut usize, *mut u8, &mut usize, &mut usize, &mut u32) -> EFIStatus,
     _padding1: [EFIHandle; 2],
     create_event: fn(EFIEventType, EFITpl, *const u8, *const u8, &mut EFIEvent) -> EFIStatus,
     set_timer: fn(EFIEvent, EFITimerDelay, u64) -> EFIStatus,
     wait_for_event: fn(usize, &[EFIEvent], &mut usize) -> EFIStatus,
     _padding2: [EFIHandle; 22],
+    /// [7.3.9. EFI_BOOT_SERVICES.OpenProtocol()](https://uefi.org/specs/UEFI/2.11/07_Services_Boot_Services.html#efi-boot-services-openprotocol)
     open_protocol: fn(EFIHandle, &GUID, *mut *mut u8, EFIHandle, EFIHandle, u32) -> EFIStatus,
     _padding3: [EFIHandle; 4],
+    /// [7.3.16. EFI_BOOT_SERVICES.LocateProtocol()](https://uefi.org/specs/UEFI/2.11/07_Services_Boot_Services.html#efi-boot-services-locateprotocol)
     locate_protocol: fn(&GUID, *const u8, *mut *mut u8) -> EFIStatus,
 }
 
@@ -260,6 +305,18 @@ const MEMORY_MAP_SIZE: usize = 4096 * 2;
 impl EFIBootServices {
     const EFI_OPEN_PROTOCOL_BY_HANDLE_PROTOCOL: u32 = 0x00000001;
 
+    pub fn allocate_pages<'a>(
+        &self,
+        typ: EFIAllocateType,
+        memory_type: EFIMemoryType,
+        pages: usize,
+        address: EFIPhysicalAddress,
+    ) -> Result<EFIPhysicalAddress> {
+        let mut address = address;
+        (self.allocate_pages)(typ, memory_type, pages, &mut address).ok()?;
+        Ok(address)
+    }
+
     pub fn get_memory_map(&self) -> Result<MemoryMap> {
         let mut memory_map = MemoryMap::default();
         (self.get_memory_map)(
@@ -273,14 +330,12 @@ impl EFIBootServices {
         Ok(memory_map)
     }
 
-    /// [7.3.16. EFI_BOOT_SERVICES.LocateProtocol()](https://uefi.org/specs/UEFI/2.11/07_Services_Boot_Services.html#efi-boot-services-locateprotocol)
     pub fn locate_protocol<'a, T: Guid>(&self) -> Result<&'a T> {
         let mut p = ptr::null_mut();
         (self.locate_protocol)(&T::guid(), ptr::null(), &mut p).ok()?;
         Ok(unsafe { &*(p as *mut T) })
     }
 
-    /// [7.3.9. EFI_BOOT_SERVICES.OpenProtocol()](https://uefi.org/specs/UEFI/2.11/07_Services_Boot_Services.html#efi-boot-services-openprotocol)
     pub fn open_protocol<'a, T: Guid>(
         &self,
         handle: EFIHandle,
@@ -423,12 +478,114 @@ pub struct EFIGraphicsOutputProtocolPixelInfo {
     pub pixels_per_scan_line: u32,
 }
 
+#[repr(transparent)]
+pub struct FileMode(u64);
+
+#[allow(non_snake_case)]
+impl FileMode {
+    const READ: u64 = 0x1;
+    const WRITE: u64 = 0x2;
+    const CREATE: u64 = 0x8000_0000_0000_0000;
+
+    pub fn Read() -> Self {
+        Self(Self::READ)
+    }
+
+    pub fn Write() -> Self {
+        Self(Self::WRITE)
+    }
+
+    pub fn Create() -> Self {
+        Self(Self::CREATE)
+    }
+}
+
+#[repr(transparent)]
+pub struct FileAttributes(u64);
+
+#[allow(non_snake_case)]
+impl FileAttributes {
+    const READ_ONLY: u64 = 0x1;
+    const HIDDEN: u64 = 0x2;
+    const SYSTEM: u64 = 0x4;
+    const RESERVED: u64 = 0x8;
+    const DIRECTORY: u64 = 0x10;
+    const ARCHIVE: u64 = 0x20;
+    const VALID_ATTR: u64 = 0x37;
+
+    pub fn ReadOnly() -> Self {
+        Self(Self::READ_ONLY)
+    }
+
+    pub fn Hidden() -> Self {
+        Self(Self::HIDDEN)
+    }
+
+    pub fn System() -> Self {
+        Self(Self::SYSTEM)
+    }
+
+    pub fn Reserved() -> Self {
+        Self(Self::RESERVED)
+    }
+
+    pub fn Directory() -> Self {
+        Self(Self::DIRECTORY)
+    }
+
+    pub fn Archive() -> Self {
+        Self(Self::ARCHIVE)
+    }
+
+    pub fn ValidAttr() -> Self {
+        Self(Self::VALID_ATTR)
+    }
+}
+
 /// [13.5.1. EFI_FILE_PROTOCOL](https://uefi.org/specs/UEFI/2.11/13_Protocols_Media_Access.html#efi-file-protocol)
 #[repr(C)]
 #[derive(Debug)]
 pub struct EFIFileProtocol {
     revision: u64,
+    /// [13.5.2. EFI_FILE_PROTOCOL.Open()](https://uefi.org/specs/UEFI/2.11/13_Protocols_Media_Access.html#efi-file-protocol-open)
     open: fn(*const EFIFileProtocol, *mut *mut EFIFileProtocol, CChar, u64, u64) -> EFIStatus,
+    close: EFIHandle,
+    delete: EFIHandle,
+    /// [13.5.5. EFI_FILE_PROTOCOL.Read()](https://uefi.org/specs/UEFI/2.11/13_Protocols_Media_Access.html#id28)
+    read: fn(*const EFIFileProtocol, *mut usize, *mut usize) -> EFIStatus,
+    _padding0: [EFIHandle; 3],
+    /// [13.5.13. EFI_FILE_PROTOCOL.GetInfo()](https://uefi.org/specs/UEFI/2.11/13_Protocols_Media_Access.html#efi-file-protocol-getinfo)
+    get_info: fn(*const EFIFileProtocol, &GUID, *mut usize, *mut u8) -> EFIStatus,
+}
+
+const _: () = {
+    use core::mem::offset_of;
+    ["get_info"][offset_of!(EFIFileProtocol, get_info) - 64];
+};
+
+impl EFIFileProtocol {
+    pub fn open(
+        &self,
+        file_name: CChar,
+        mode: FileMode,
+        attributes: FileAttributes,
+    ) -> Result<&EFIFileProtocol> {
+        let mut p = ptr::null_mut();
+        (self.open)(self, &mut p, file_name, mode.0, attributes.0).ok()?;
+        Ok(unsafe { &*p })
+    }
+
+    pub fn read(&self, size: usize, address: usize) -> Result<&[u8]> {
+        let mut buffer_size = size;
+        (self.read)(self, &mut buffer_size, address as *mut _).ok()?;
+        Ok(unsafe { core::slice::from_raw_parts(address as *const u8, buffer_size) })
+    }
+
+    pub fn get_info<T: Guid>(&self, file_info_buffer: &mut [u8]) -> Result<&T> {
+        let mut len = file_info_buffer.len();
+        (self.get_info)(self, &T::guid(), &mut len, file_info_buffer.as_mut_ptr()).ok()?;
+        Ok(unsafe { &*(file_info_buffer.as_ptr() as *const T) })
+    }
 }
 
 /// [9.1.1. EFI_LOADED_IMAGE_PROTOCOL](https://uefi.org/specs/UEFI/2.11/09_Protocols_EFI_Loaded_Image.html#id3)
@@ -472,4 +629,40 @@ impl Guid for EFISimpleFileSystemProtocol {
     fn guid() -> GUID {
         EFI_SIMPLE_FILE_SYSTEM_PROTOCOL_GUID
     }
+}
+
+/// [13.5.16. EFI_FILE_INFO](https://uefi.org/specs/UEFI/2.11/13_Protocols_Media_Access.html#efi-file-info)
+#[repr(C)]
+pub struct EFIFileInfo {
+    pub size: u64,
+    pub file_size: u64,
+    pub physical_size: u64,
+    pub create_time: EFITime,
+    pub last_access_time: EFITime,
+    pub modification_time: EFITime,
+    pub attributes: u64,
+    pub file_name: CChar,
+}
+
+impl Guid for EFIFileInfo {
+    fn guid() -> GUID {
+        EFI_FILE_INFO_GUID
+    }
+}
+
+/// [8.3.1. GetTime()](https://uefi.org/specs/UEFI/2.11/08_Services_Runtime_Services.html#gettime)
+#[repr(C)]
+#[derive(Debug)]
+pub struct EFITime {
+    pub year: u16,  // 1900 - 9999
+    pub month: u8,  // 1 - 12
+    pub day: u8,    // 1 - 31
+    pub hour: u8,   // 0 - 23
+    pub minute: u8, // 0 - 59
+    pub second: u8, // 0 - 59
+    _pad0: u8,
+    pub nano_sec: u32,  // 0 - 999_999_999
+    pub time_zone: i32, // -1440 - 1440 or 2047
+    pub day_light: u8,
+    _pad1: u8,
 }
