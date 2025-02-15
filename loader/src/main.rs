@@ -111,6 +111,8 @@ fn efi_main(image_handle: EFIHandle, system_table: &'static EFISystemTable) -> !
 
     dbg!(kernel_ehdr.entry_addr());
 
+    dbg!(graphics_output.mode.info.pixels_per_scan_line);
+
     if system_table
         .boot_services
         .exit_boot_services(image_handle, memory_map.map_key)
@@ -123,12 +125,37 @@ fn efi_main(image_handle: EFIHandle, system_table: &'static EFISystemTable) -> !
             .unwrap();
     }
 
+    struct FrameBufferConfig {
+        frame_buffer: *mut u8,
+        pixels_per_scan_line: u32,
+        horizontal_resolution: u32,
+        vertical_resolution: u32,
+        pixel_format: PixelFormat,
+    }
+
+    enum PixelFormat {
+        RGBR, // red. green, blue, reserved
+        BGRR, // blue, greem, red, reserved
+    }
+
+    let config = FrameBufferConfig {
+        frame_buffer: graphics_output.mode.frame_buffer_base as _,
+        pixels_per_scan_line: graphics_output.mode.info.pixels_per_scan_line,
+        horizontal_resolution: graphics_output.mode.info.horizontal_resolution,
+        vertical_resolution: graphics_output.mode.info.vertical_resolution,
+        pixel_format: match graphics_output.mode.info.pixel_format {
+            0 => PixelFormat::RGBR,
+            1 => PixelFormat::BGRR,
+            _ => unimplemented!(),
+        },
+    };
+
     let entry_point = unsafe {
-        core::mem::transmute::<*const u8, extern "sysv64" fn(*const u8, usize)>(
+        core::mem::transmute::<*const u8, extern "sysv64" fn(&FrameBufferConfig)>(
             kernel_ehdr.entry_addr() as *const u8,
         )
     };
-    entry_point(frame_buffer.as_ptr(), frame_buffer.len());
+    entry_point(&config);
 
     // cube::rotate(system_table, frame_buffer);
 

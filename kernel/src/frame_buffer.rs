@@ -1,0 +1,68 @@
+use crate::Result;
+use core::slice;
+
+pub struct FrameBufferConfig {
+    frame_buffer: *mut u8,
+    pixels_per_scan_line: u32,
+    pub horizontal_resolution: u32,
+    pub vertical_resolution: u32,
+    pub pixel_format: PixelFormat,
+}
+
+impl FrameBufferConfig {
+    pub fn as_slice_mut(&mut self) -> &mut [u8] {
+        unsafe {
+            slice::from_raw_parts_mut(
+                self.frame_buffer,
+                (self.horizontal_resolution * self.vertical_resolution * 4) as usize,
+            )
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum PixelFormat {
+    RGBR, // red. green, blue, reserved
+    BGRR, // blue, greem, red, reserved
+}
+
+pub trait PixelWriter {
+    fn pixel_at(&mut self, x: u32, y: u32) -> Option<&mut [u8]>;
+    fn write(&mut self, x: u32, y: u32, rgb: Rgb) -> Result<()>;
+}
+
+pub struct BGRPixelWriter<'a>(&'a mut FrameBufferConfig);
+
+impl<'a> BGRPixelWriter<'a> {
+    pub fn new(frame_buffer_config: &'a mut FrameBufferConfig) -> Self {
+        Self(frame_buffer_config)
+    }
+}
+
+impl PixelWriter for BGRPixelWriter<'_> {
+    fn pixel_at(&mut self, x: u32, y: u32) -> Option<&mut [u8]> {
+        let index = (y * self.0.horizontal_resolution + x) as usize;
+        self.0.as_slice_mut().chunks_mut(4).nth(index)
+    }
+
+    fn write(&mut self, x: u32, y: u32, rgb: Rgb) -> Result<()> {
+        let pixel = self.pixel_at(x, y).ok_or("out of buffer")?;
+        pixel[0] = rgb.b;
+        pixel[1] = rgb.g;
+        pixel[2] = rgb.r;
+        Ok(())
+    }
+}
+
+#[derive(Debug, Default, Clone, Copy)]
+pub struct Rgb {
+    r: u8,
+    g: u8,
+    b: u8,
+}
+
+impl Rgb {
+    pub fn new(r: u8, g: u8, b: u8) -> Self {
+        Self { r, g, b }
+    }
+}
