@@ -65,4 +65,61 @@ impl Rgb {
     pub fn new(r: u8, g: u8, b: u8) -> Self {
         Self { r, g, b }
     }
+
+    pub fn white() -> Self {
+        Self {
+            r: 255,
+            g: 255,
+            b: 255,
+        }
+    }
+
+    pub fn black() -> Self {
+        Default::default()
+    }
+
+    pub fn red() -> Self {
+        Self {
+            r: 255,
+            ..Default::default()
+        }
+    }
+
+    pub fn green() -> Self {
+        Self {
+            g: 255,
+            ..Default::default()
+        }
+    }
+
+    pub fn blue() -> Self {
+        Self {
+            b: 255,
+            ..Default::default()
+        }
+    }
+
+    pub fn yellow() -> Self {
+        Self {
+            r: 255,
+            g: 255,
+            b: 0,
+        }
+    }
+
+    pub fn purple() -> Self {
+        Self {
+            r: 255,
+            g: 0,
+            b: 255,
+        }
+    }
+
+    pub fn cyan() -> Self {
+        Self {
+            r: 0,
+            g: 255,
+            b: 255,
+        }
+    }
 }
