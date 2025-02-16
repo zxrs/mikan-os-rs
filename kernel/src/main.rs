@@ -10,6 +10,8 @@ use fonts::TextWriter;
 mod frame_buffer;
 use frame_buffer::{BGRPixelWriter, FrameBufferConfig, PixelFormat, Rgb};
 
+mod console;
+
 pub type Result<T> = core::result::Result<T, &'static str>;
 
 #[unsafe(no_mangle)]
