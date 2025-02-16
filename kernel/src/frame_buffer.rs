@@ -1,4 +1,5 @@
 use crate::Result;
+use core::fmt;
 use core::slice;
 
 pub struct FrameBufferConfig {
@@ -10,7 +11,7 @@ pub struct FrameBufferConfig {
 }
 
 impl FrameBufferConfig {
-    pub fn as_slice_mut(&mut self) -> &mut [u8] {
+    pub fn frame_buffer(&mut self) -> &mut [u8] {
         unsafe {
             slice::from_raw_parts_mut(
                 self.frame_buffer,
@@ -31,18 +32,18 @@ pub trait PixelWriter {
     fn write(&mut self, x: u32, y: u32, rgb: Rgb) -> Result<()>;
 }
 
-pub struct BGRPixelWriter<'a>(&'a mut FrameBufferConfig);
+pub struct BGRPixelWriter(&'static mut FrameBufferConfig);
 
-impl<'a> BGRPixelWriter<'a> {
-    pub fn new(frame_buffer_config: &'a mut FrameBufferConfig) -> Self {
+impl BGRPixelWriter {
+    pub fn new(frame_buffer_config: &'static mut FrameBufferConfig) -> Self {
         Self(frame_buffer_config)
     }
 }
 
-impl PixelWriter for BGRPixelWriter<'_> {
+impl PixelWriter for BGRPixelWriter {
     fn pixel_at(&mut self, x: u32, y: u32) -> Option<&mut [u8]> {
         let index = (y * self.0.horizontal_resolution + x) as usize;
-        self.0.as_slice_mut().chunks_mut(4).nth(index)
+        self.0.frame_buffer().chunks_mut(4).nth(index)
     }
 
     fn write(&mut self, x: u32, y: u32, rgb: Rgb) -> Result<()> {
