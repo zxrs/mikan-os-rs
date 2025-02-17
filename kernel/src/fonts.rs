@@ -1,28 +1,4 @@
 use crate::{Result, Rgb, frame_buffer::PixelWriter};
-use core::fmt;
-
-pub struct TextWriter<W: PixelWriter> {
-    writer: W,
-    x: u32,
-    y: u32,
-    rgb: Rgb,
-}
-
-impl<W: PixelWriter> TextWriter<W> {
-    pub fn new(writer: W, x: u32, y: u32, rgb: Rgb) -> Self {
-        Self { writer, x, y, rgb }
-    }
-}
-
-impl<W: PixelWriter> fmt::Write for TextWriter<W> {
-    fn write_str(&mut self, s: &str) -> fmt::Result {
-        let (x, y) =
-            write_string(&mut self.writer, self.x, self.y, s, self.rgb).map_err(|_| fmt::Error)?;
-        self.x = x;
-        self.y = y;
-        Ok(())
-    }
-}
 
 pub fn write_string<W: PixelWriter>(
     writer: &mut W,
@@ -30,15 +6,12 @@ pub fn write_string<W: PixelWriter>(
     y: u32,
     s: &str,
     rgb: Rgb,
-) -> Result<(u32, u32)> {
-    let mut x = x;
-    let mut y = y;
+) -> Result<()> {
     s.chars().try_for_each(|c| {
-        x += 8;
         write_ascii(writer, x, y, c, rgb)?;
         Ok(())
     })?;
-    Ok((x, y))
+    Ok(())
 }
 
 pub fn write_ascii<W: PixelWriter>(
