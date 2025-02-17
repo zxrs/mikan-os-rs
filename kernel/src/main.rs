@@ -5,6 +5,11 @@
 use core::arch::asm;
 use core::fmt::Write;
 
+static mut CONSOLE: Option<Console<BGRPixelWriter>> = None;
+
+#[macro_use]
+mod macros;
+
 mod fonts;
 
 mod console;
@@ -23,10 +28,16 @@ extern "C" fn kernel_main(frame_buffer_config: &'static mut FrameBufferConfig) -
         _ => unimplemented!(),
     };
 
-    let mut console = Console::new(writer, Rgb::white(), Rgb::black());
+    let console = Console::new(writer, Rgb::white(), Rgb::black());
+    unsafe { CONSOLE = Some(console) };
+
     (0..30).for_each(|i| {
-        writeln!(&mut console, "line: {}", i).unwrap();
+        dbg!(i);
     });
+
+    //(0..30).for_each(|i| {
+    //    writeln!(&mut console, "line: {}", i).unwrap();
+    //});
 
     loop {
         unsafe { asm!("hlt") };

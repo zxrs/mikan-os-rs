@@ -1,7 +1,7 @@
 use crate::Result;
-use core::fmt;
 use core::slice;
 
+#[allow(unused)]
 pub struct FrameBufferConfig {
     frame_buffer: *mut u8,
     pixels_per_scan_line: u32,
@@ -21,6 +21,8 @@ impl FrameBufferConfig {
     }
 }
 
+#[allow(unused)]
+#[allow(clippy::upper_case_acronyms)]
 #[derive(Debug, Clone, Copy)]
 pub enum PixelFormat {
     RGBR, // red. green, blue, reserved
@@ -62,6 +64,7 @@ pub struct Rgb {
     b: u8,
 }
 
+#[allow(unused)]
 impl Rgb {
     pub fn new(r: u8, g: u8, b: u8) -> Self {
         Self { r, g, b }

@@ -17,10 +17,10 @@ use elf::{Elf64_Ehdr, calc_load_address_range, copy_load_segments};
 mod uefi;
 mod x86;
 use uefi::{
-    CChar, EFIAllocateType, EFIEventType, EFIFileInfo, EFIGraphicsOutputProtocol, EFIHandle,
+    CChar, EFIAllocateType, EFIFileInfo, EFIGraphicsOutputProtocol, EFIHandle,
     EFILoadedImageProtocol, EFIMemoryType, EFISimpleFileSystemProtocol,
-    EFISimpleTextOutputProtocolWriter, EFISystemTable, EFITimerDelay, EFITpl, FileAttributes,
-    FileMode, MemoryDescriptorVisitor,
+    EFISimpleTextOutputProtocolWriter, EFISystemTable, FileAttributes, FileMode,
+    MemoryDescriptorVisitor,
 };
 
 /// [4.1.1. EFI_IMAGE_ENTRY_POINT](https://uefi.org/specs/UEFI/2.11/04_EFI_System_Table.html#efi-image-entry-point)
@@ -125,6 +125,7 @@ fn efi_main(image_handle: EFIHandle, system_table: &'static EFISystemTable) -> !
             .unwrap();
     }
 
+    #[allow(dead_code)]
     struct FrameBufferConfig {
         frame_buffer: *mut u8,
         pixels_per_scan_line: u32,
@@ -133,6 +134,7 @@ fn efi_main(image_handle: EFIHandle, system_table: &'static EFISystemTable) -> !
         pixel_format: PixelFormat,
     }
 
+    #[allow(clippy::upper_case_acronyms)]
     enum PixelFormat {
         RGBR, // red. green, blue, reserved
         BGRR, // blue, greem, red, reserved

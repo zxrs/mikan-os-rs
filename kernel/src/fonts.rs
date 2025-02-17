@@ -1,5 +1,6 @@
 use crate::{Result, Rgb, frame_buffer::PixelWriter};
 
+#[allow(dead_code)]
 pub fn write_string<W: PixelWriter>(
     writer: &mut W,
     x: u32,

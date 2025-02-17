@@ -1,13 +1,12 @@
 # `cargo make launch` for debug build
 # `cargo make --profile prod launch` for release build
 
-[tasks.editloader]
+[tasks.clpy]
 script = '''
-hx loader/src/main.rs loader/src/uefi.rs
-'''
-[tasks.editkernel]
-script = '''
-hx kernel/src/main.rs
+cd loader
+cargo clippy
+cd ../kernel
+cargo clippy
 '''
 
 [tasks.doc]

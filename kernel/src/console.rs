@@ -65,7 +65,9 @@ impl<W: PixelWriter> Console<W> {
                 Ok(())
             })?;
             self.buffer.rotate_left(1);
-            self.buffer.last_mut().map(|last_row| last_row.fill('\0'));
+            if let Some(last_row) = self.buffer.last_mut() {
+                last_row.fill('\0');
+            };
 
             self.buffer.iter().enumerate().try_for_each(|(j, row)| {
                 row.iter().enumerate().try_for_each(|(i, c)| {
