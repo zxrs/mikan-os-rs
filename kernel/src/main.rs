@@ -20,6 +20,37 @@ use frame_buffer::{BGRPixelWriter, FrameBufferConfig, PixelFormat, Rgb};
 
 pub type Result<T> = core::result::Result<T, &'static str>;
 
+const MOUSE_CURSOR_WIDTH: usize = 15;
+const MOUSE_CURSOR_HEIGHT: usize = 24;
+#[rustfmt::skip]
+const MOUSE_CURSOR_SHAPE: [&str; MOUSE_CURSOR_HEIGHT] = [
+   //0123456789abcde
+    "@              ",
+    "@@             ",
+    "@.@            ",
+    "@..@           ",
+    "@...@          ",
+    "@....@         ",
+    "@.....@        ",
+    "@......@       ",
+    "@.......@      ",
+    "@........@     ",
+    "@.........@    ",
+    "@..........@   ",
+    "@...........@  ",
+    "@............@ ",
+    "@......@@@@@@@@",
+    "@......@       ",
+    "@....@@.@      ",
+    "@...@ @.@      ",
+    "@..@   @.@     ",
+    "@.@    @.@     ",
+    "@@      @.@    ",
+    "@       @.@    ",
+    "         @.@   ",
+    "         @@@   ",
+];
+
 #[unsafe(no_mangle)]
 extern "C" fn kernel_main(frame_buffer_config: &'static mut FrameBufferConfig) -> ! {
     frame_buffer_config.frame_buffer().fill(0);
@@ -45,7 +76,11 @@ extern "C" fn kernel_main(frame_buffer_config: &'static mut FrameBufferConfig) -
 }
 
 #[panic_handler]
-fn panic_impl(_: &core::panic::PanicInfo) -> ! {
+fn panic_impl(info: &core::panic::PanicInfo) -> ! {
+    println!();
+    println!("PANIC!!!");
+    println!("{info}");
+
     loop {
         unsafe { asm!("hlt") };
     }
