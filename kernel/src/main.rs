@@ -15,8 +15,10 @@ use console::Console;
 
 mod frame_buffer;
 use frame_buffer::{BGRPixelWriter, FrameBufferConfig, PixelFormat, PixelWriter, Rgb};
+use graphics::draw_rectangle;
 
 mod graphics;
+use graphics::Vector2D;
 
 // TODO: should be replaced with safe rust code...
 static mut CONSOLE: Option<Console> = None;
@@ -96,6 +98,13 @@ extern "C" fn kernel_main(frame_buffer_config: &'static mut FrameBufferConfig) -
             }
         });
     });
+
+    draw_rectangle(
+        &Vector2D::new(100, 100),
+        &Vector2D::new(100, 100),
+        Rgb::red(),
+    )
+    .unwrap();
 
     //(0..30).for_each(|i| {
     //    writeln!(&mut console, "line: {}", i).unwrap();
