@@ -16,6 +16,8 @@ use console::Console;
 mod frame_buffer;
 use frame_buffer::{BGRPixelWriter, FrameBufferConfig, PixelFormat, PixelWriter, Rgb};
 
+mod graphics;
+
 // TODO: should be replaced with safe rust code...
 static mut CONSOLE: Option<Console> = None;
 fn console() -> &'static mut Console {
