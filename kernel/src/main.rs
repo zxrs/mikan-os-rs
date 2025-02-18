@@ -5,8 +5,6 @@
 use core::arch::asm;
 use core::fmt::Write;
 
-static mut CONSOLE: Option<Console<BGRPixelWriter>> = None;
-
 #[macro_use]
 mod macros;
 
@@ -17,6 +15,22 @@ use console::Console;
 
 mod frame_buffer;
 use frame_buffer::{BGRPixelWriter, FrameBufferConfig, PixelFormat, Rgb};
+
+// TODO: should be replaced with safe rust code...
+static mut CONSOLE: Option<Console> = None;
+fn console() -> &'static mut Console {
+    unsafe {
+        #[allow(static_mut_refs)]
+        CONSOLE.as_mut().unwrap()
+    }
+}
+static mut PIXEL_WRITER: Option<BGRPixelWriter> = None;
+fn pixel_writer() -> &'static mut BGRPixelWriter {
+    unsafe {
+        #[allow(static_mut_refs)]
+        PIXEL_WRITER.as_mut().unwrap()
+    }
+}
 
 pub type Result<T> = core::result::Result<T, &'static str>;
 
@@ -58,8 +72,9 @@ extern "C" fn kernel_main(frame_buffer_config: &'static mut FrameBufferConfig) -
         PixelFormat::BGRR => BGRPixelWriter::new(frame_buffer_config),
         _ => unimplemented!(),
     };
+    unsafe { PIXEL_WRITER = Some(writer) };
 
-    let console = Console::new(writer, Rgb::white(), Rgb::black());
+    let console = Console::new(Rgb::white(), Rgb::black());
     unsafe { CONSOLE = Some(console) };
 
     (0..30).for_each(|i| {

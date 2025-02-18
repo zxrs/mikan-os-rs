@@ -2,14 +2,14 @@ use crate::{
     Result,
     fonts::write_ascii,
     frame_buffer::{PixelWriter, Rgb},
+    pixel_writer,
 };
 use core::{fmt, str};
 
 const ROWS: usize = 25;
 const COLS: usize = 80;
 
-pub struct Console<W: PixelWriter> {
-    writer: W,
+pub struct Console {
     fg_color: Rgb,
     bg_color: Rgb,
     buffer: [[char; COLS]; ROWS],
@@ -17,14 +17,14 @@ pub struct Console<W: PixelWriter> {
     cursor_col: usize,
 }
 
-impl<W: PixelWriter> fmt::Write for Console<W> {
+impl fmt::Write for Console {
     fn write_str(&mut self, s: &str) -> fmt::Result {
         s.chars().try_for_each(|c| {
             if c.eq(&'\n') {
                 self.new_line().map_err(|_| fmt::Error)?;
             } else if self.cursor_col < COLS {
                 write_ascii(
-                    &mut self.writer,
+                    pixel_writer(),
                     8 * self.cursor_col as u32,
                     16 * self.cursor_row as u32,
                     c,
@@ -40,10 +40,9 @@ impl<W: PixelWriter> fmt::Write for Console<W> {
     }
 }
 
-impl<W: PixelWriter> Console<W> {
-    pub fn new(writer: W, fg_color: Rgb, bg_color: Rgb) -> Self {
+impl Console {
+    pub fn new(fg_color: Rgb, bg_color: Rgb) -> Self {
         Self {
-            writer,
             fg_color,
             bg_color,
             buffer: [['\0'; COLS]; ROWS],
@@ -59,7 +58,7 @@ impl<W: PixelWriter> Console<W> {
         } else {
             (0..ROWS * 16).try_for_each(|y| {
                 (0..COLS * 8).try_for_each(|x| {
-                    self.writer.write(x as u32, y as u32, self.bg_color)?;
+                    pixel_writer().write(x as u32, y as u32, self.bg_color)?;
                     Ok(())
                 })?;
                 Ok(())
@@ -72,7 +71,7 @@ impl<W: PixelWriter> Console<W> {
             self.buffer.iter().enumerate().try_for_each(|(j, row)| {
                 row.iter().enumerate().try_for_each(|(i, c)| {
                     write_ascii(
-                        &mut self.writer,
+                        pixel_writer(),
                         i as u32 * 8,
                         j as u32 * 16,
                         *c,
