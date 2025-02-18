@@ -14,7 +14,7 @@ mod console;
 use console::Console;
 
 mod frame_buffer;
-use frame_buffer::{BGRPixelWriter, FrameBufferConfig, PixelFormat, Rgb};
+use frame_buffer::{BGRPixelWriter, FrameBufferConfig, PixelFormat, PixelWriter, Rgb};
 
 // TODO: should be replaced with safe rust code...
 static mut CONSOLE: Option<Console> = None;
@@ -79,6 +79,20 @@ extern "C" fn kernel_main(frame_buffer_config: &'static mut FrameBufferConfig) -
 
     (0..30).for_each(|i| {
         dbg!(i);
+    });
+
+    (0..MOUSE_CURSOR_HEIGHT).for_each(|dy| {
+        (0..MOUSE_CURSOR_WIDTH).for_each(|dx| {
+            if MOUSE_CURSOR_SHAPE[dy].chars().nth(dx).eq(&Some('@')) {
+                pixel_writer()
+                    .write(200 + dx as u32, 100 + dy as u32, Rgb::black())
+                    .unwrap();
+            } else if MOUSE_CURSOR_SHAPE[dy].chars().nth(dx).eq(&Some('.')) {
+                pixel_writer()
+                    .write(200 + dx as u32, 100 + dy as u32, Rgb::white())
+                    .unwrap();
+            }
+        });
     });
 
     //(0..30).for_each(|i| {
