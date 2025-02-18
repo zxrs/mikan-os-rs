@@ -20,6 +20,8 @@ use graphics::draw_rectangle;
 mod graphics;
 use graphics::Vector2D;
 
+mod pci;
+
 // TODO: should be replaced with safe rust code...
 static mut CONSOLE: Option<Console> = None;
 fn console() -> &'static mut Console {
