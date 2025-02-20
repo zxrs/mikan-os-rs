@@ -22,6 +22,8 @@ use graphics::Vector2D;
 
 mod pci;
 
+mod x86;
+
 // TODO: should be replaced with safe rust code...
 static mut CONSOLE: Option<Console> = None;
 fn console() -> &'static mut Console {
@@ -113,7 +115,7 @@ extern "C" fn kernel_main(frame_buffer_config: &'static mut FrameBufferConfig) -
     //});
 
     loop {
-        unsafe { asm!("hlt") };
+        x86::halt();
     }
 }
 
@@ -124,6 +126,6 @@ fn panic_impl(info: &core::panic::PanicInfo) -> ! {
     println!("{info}");
 
     loop {
-        unsafe { asm!("hlt") };
+        x86::halt();
     }
 }
