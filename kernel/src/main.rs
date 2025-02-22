@@ -15,12 +15,12 @@ use console::Console;
 
 mod frame_buffer;
 use frame_buffer::{BGRPixelWriter, FrameBufferConfig, PixelFormat, PixelWriter, Rgb};
-use graphics::draw_rectangle;
 
 mod graphics;
-use graphics::Vector2D;
+use graphics::{Vector2D, draw_rectangle};
 
 mod pci;
+use pci::{DEVICES, read_bar, read_vendor_id_from_device, scan_all_bus};
 
 mod x86;
 
@@ -75,6 +75,13 @@ const MOUSE_CURSOR_SHAPE: [&str; MOUSE_CURSOR_HEIGHT] = [
 
 #[unsafe(no_mangle)]
 extern "C" fn kernel_main(frame_buffer_config: &'static mut FrameBufferConfig) -> ! {
+    main(frame_buffer_config).unwrap();
+    loop {
+        x86::halt();
+    }
+}
+
+fn main(frame_buffer_config: &'static mut FrameBufferConfig) -> Result<()> {
     frame_buffer_config.frame_buffer().fill(0);
     let writer = match frame_buffer_config.pixel_format {
         PixelFormat::BGRR => BGRPixelWriter::new(frame_buffer_config),
@@ -85,38 +92,52 @@ extern "C" fn kernel_main(frame_buffer_config: &'static mut FrameBufferConfig) -
     let console = Console::new(Rgb::white(), Rgb::black());
     unsafe { CONSOLE = Some(console) };
 
-    (0..30).for_each(|i| {
-        dbg!(i);
-    });
-
-    (0..MOUSE_CURSOR_HEIGHT).for_each(|dy| {
-        (0..MOUSE_CURSOR_WIDTH).for_each(|dx| {
+    (0..MOUSE_CURSOR_HEIGHT).try_for_each(|dy| {
+        (0..MOUSE_CURSOR_WIDTH).try_for_each(|dx| {
             if MOUSE_CURSOR_SHAPE[dy].chars().nth(dx).eq(&Some('@')) {
-                pixel_writer()
-                    .write(200 + dx as u32, 100 + dy as u32, Rgb::black())
-                    .unwrap();
+                pixel_writer().write(200 + dx as u32, 100 + dy as u32, Rgb::black())
             } else if MOUSE_CURSOR_SHAPE[dy].chars().nth(dx).eq(&Some('.')) {
-                pixel_writer()
-                    .write(200 + dx as u32, 100 + dy as u32, Rgb::white())
-                    .unwrap();
+                pixel_writer().write(200 + dx as u32, 100 + dy as u32, Rgb::white())
+            } else {
+                Ok(())
             }
-        });
-    });
+        })
+    })?;
 
     draw_rectangle(
         &Vector2D::new(100, 100),
         &Vector2D::new(100, 100),
         Rgb::red(),
-    )
-    .unwrap();
+    )?;
 
-    //(0..30).for_each(|i| {
-    //    writeln!(&mut console, "line: {}", i).unwrap();
-    //});
+    scan_all_bus()?;
 
-    loop {
-        x86::halt();
-    }
+    let xhc_dev = unsafe { DEVICES }
+        .iter()
+        .filter_map(|dev| {
+            let dev = (*dev)?;
+            // println!("0x{:04x}", read_vendor_id_from_device(&dev));
+            if dev.class_code.eq(&(0x0c, 0x03, 0x30))
+            //&& read_vendor_id_from_device(&dev).eq(&0x8086)
+            {
+                return Some(dev);
+            }
+            None
+        })
+        .next()
+        .ok_or("no xhci device")?;
+
+    dbg!(&xhc_dev);
+
+    let xhc_bar = read_bar(&xhc_dev, 0)?;
+    let xhc_mmio_base = xhc_bar & 0xf;
+
+    println!(
+        "xhc_bar: 0x{:08x}, xhc_mmio_base: 0x{:08x}",
+        xhc_bar, xhc_mmio_base
+    );
+
+    Ok(())
 }
 
 #[panic_handler]

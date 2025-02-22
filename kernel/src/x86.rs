@@ -5,11 +5,11 @@ pub fn halt() {
 }
 
 pub fn io_out32(addr: u16, data: u32) {
-    unsafe { asm!("out {0:x}, eax", in(reg) addr, in("eax") data) };
+    unsafe { asm!("out dx, eax", in("dx") addr, in("eax") data) };
 }
 
 pub fn io_in32(addr: u16) -> u32 {
     let a;
-    unsafe { asm!("in eax {0:x}", in(reg) addr, out("eax") a) };
+    unsafe { asm!("in eax, dx", in("dx") addr, out("eax") a) };
     a
 }
