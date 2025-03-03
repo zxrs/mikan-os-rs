@@ -14,13 +14,16 @@ mod console;
 use console::Console;
 
 mod frame_buffer;
-use frame_buffer::{BGRPixelWriter, FrameBufferConfig, PixelFormat, PixelWriter, Rgb};
+use frame_buffer::{BGRPixelWriter, FrameBufferConfig, PixelFormat, Rgb};
 
 mod graphics;
 use graphics::{Vector2D, draw_rectangle};
 
+mod mouse;
+use mouse::MouseCursor;
+
 mod pci;
-use pci::{DEVICES, read_bar, read_vendor_id_from_device, scan_all_bus};
+use pci::{DEVICES, read_bar, scan_all_bus};
 
 mod x86;
 
@@ -43,38 +46,9 @@ fn pixel_writer() -> &'static mut BGRPixelWriter {
     }
 }
 
-pub type Result<T> = core::result::Result<T, &'static str>;
+static mut MOUSE_CURSOR: Option<MouseCursor> = None;
 
-const MOUSE_CURSOR_WIDTH: usize = 15;
-const MOUSE_CURSOR_HEIGHT: usize = 24;
-#[rustfmt::skip]
-const MOUSE_CURSOR_SHAPE: [&str; MOUSE_CURSOR_HEIGHT] = [
-   //0123456789abcde
-    "@              ",
-    "@@             ",
-    "@.@            ",
-    "@..@           ",
-    "@...@          ",
-    "@....@         ",
-    "@.....@        ",
-    "@......@       ",
-    "@.......@      ",
-    "@........@     ",
-    "@.........@    ",
-    "@..........@   ",
-    "@...........@  ",
-    "@............@ ",
-    "@......@@@@@@@@",
-    "@......@       ",
-    "@....@@.@      ",
-    "@...@ @.@      ",
-    "@..@   @.@     ",
-    "@.@    @.@     ",
-    "@@      @.@    ",
-    "@       @.@    ",
-    "         @.@   ",
-    "         @@@   ",
-];
+pub type Result<T> = core::result::Result<T, &'static str>;
 
 #[unsafe(no_mangle)]
 extern "C" fn kernel_main(frame_buffer_config: &'static mut FrameBufferConfig) -> ! {
@@ -95,17 +69,8 @@ fn main(frame_buffer_config: &'static mut FrameBufferConfig) -> Result<()> {
     let console = Console::new(Rgb::white(), Rgb::black());
     unsafe { CONSOLE = Some(console) };
 
-    (0..MOUSE_CURSOR_HEIGHT).try_for_each(|dy| {
-        (0..MOUSE_CURSOR_WIDTH).try_for_each(|dx| {
-            if MOUSE_CURSOR_SHAPE[dy].chars().nth(dx).eq(&Some('@')) {
-                pixel_writer().write(200 + dx as u32, 100 + dy as u32, Rgb::black())
-            } else if MOUSE_CURSOR_SHAPE[dy].chars().nth(dx).eq(&Some('.')) {
-                pixel_writer().write(200 + dx as u32, 100 + dy as u32, Rgb::white())
-            } else {
-                Ok(())
-            }
-        })
-    })?;
+    let mouse_cursor = MouseCursor::new(Rgb::black(), Vector2D::new(200, 100))?;
+    unsafe { MOUSE_CURSOR = Some(mouse_cursor) };
 
     draw_rectangle(
         &Vector2D::new(100, 100),
@@ -154,7 +119,9 @@ fn main(frame_buffer_config: &'static mut FrameBufferConfig) -> Result<()> {
 }
 
 extern "C" fn mouse_observer(dx: i8, dy: i8) {
-    dbg!(dx, dy);
+    #[allow(static_mut_refs)]
+    let mouse_corsor = unsafe { MOUSE_CURSOR.as_mut().unwrap() };
+    mouse_corsor.move_relative(Vector2D::new(dx as i32, dy as i32));
 }
 
 #[panic_handler]
