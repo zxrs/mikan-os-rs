@@ -14,13 +14,7 @@ unsafe extern "C" {
 #[repr(C)]
 #[derive(Debug)]
 struct UsbXhciController {
-    mmio_base_: usize,
-    cap_: *mut u8,
-    op_: *mut u8,
-    max_ports_: u8,
-    devmgr_: UsbXhciDeviceManager,
-    cr_: UsbXhciRing,
-    er_: UsbXhciEventRing,
+    _padding: [u8; 128],
 }
 
 impl UsbXhciController {
@@ -29,33 +23,6 @@ impl UsbXhciController {
         unsafe { usb_xhci_Controller_Controller(__bindgen_tmp.as_mut_ptr(), mmio_base) };
         unsafe { __bindgen_tmp.assume_init() }
     }
-}
-
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-struct UsbXhciDeviceManager {
-    device_context_pointers_: *mut *mut u8,
-    max_slots_: usize,
-    devices_: *mut *mut u8,
-}
-
-#[repr(C)]
-#[derive(Debug)]
-struct UsbXhciRing {
-    buf_: *mut u8,
-    buf_size_: usize,
-    cycle_bit_: bool,
-    write_index_: usize,
-}
-
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-struct UsbXhciEventRing {
-    buf_: *mut u8,
-    buf_size_: usize,
-    cycle_bit_: bool,
-    erst_: *mut u8,
-    interrupter_: *mut u8,
 }
 
 type MouseObserver = extern "C" fn(i8, i8);
