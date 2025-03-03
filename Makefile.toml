@@ -74,6 +74,19 @@ sudo umount mnt
 '''
 dependencies = ["loader-release", "loader", "kernel-release", "kernel"]
 
+[tasks.bindgen]
+script = '''
+bindgen mikanos/kernel/usb/xhci/xhci.hpp \
+-o kernel/src/usb/bindings.rs \
+--use-core \
+--allowlist-item usb::xhci::.* \
+-- \
+-std=c++17 \
+-Imikanos/kernel \
+-I../../osbook/denenv/x86_64-elf/include/c++/v1 \
+-D__ELF__
+'''
+
 [tasks.launch]
 script = '''
 qemu-system-x86_64 \

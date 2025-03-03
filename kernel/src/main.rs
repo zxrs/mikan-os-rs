@@ -24,6 +24,9 @@ use pci::{DEVICES, read_bar, read_vendor_id_from_device, scan_all_bus};
 
 mod x86;
 
+mod usb;
+use usb::XhciController;
+
 // TODO: should be replaced with safe rust code...
 static mut CONSOLE: Option<Console> = None;
 fn console() -> &'static mut Console {
@@ -130,14 +133,27 @@ fn main(frame_buffer_config: &'static mut FrameBufferConfig) -> Result<()> {
     dbg!(&xhc_dev);
 
     let xhc_bar = read_bar(&xhc_dev, 0)?;
-    let xhc_mmio_base = xhc_bar & 0xf;
+    let xhc_mmio_base = xhc_bar & !0xf;
 
     println!(
         "xhc_bar: 0x{:08x}, xhc_mmio_base: 0x{:08x}",
         xhc_bar, xhc_mmio_base
     );
 
+    let mut xhc = XhciController::new(xhc_mmio_base as usize);
+    xhc.initialize()?;
+    xhc.run()?;
+    dbg!();
+    usb::register_mouse_observer(mouse_observer);
+    loop {
+        xhc.process_event();
+    }
+
     Ok(())
+}
+
+extern "C" fn mouse_observer(dx: i8, dy: i8) {
+    dbg!(dx, dy);
 }
 
 #[panic_handler]
