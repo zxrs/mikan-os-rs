@@ -47,6 +47,12 @@ fn pixel_writer() -> &'static mut BGRPixelWriter {
 }
 
 static mut MOUSE_CURSOR: Option<MouseCursor> = None;
+fn mouse_cursor() -> &'static mut MouseCursor {
+    unsafe {
+        #[allow(static_mut_refs)]
+        MOUSE_CURSOR.as_mut().unwrap()
+    }
+}
 
 pub type Result<T> = core::result::Result<T, &'static str>;
 
@@ -119,9 +125,7 @@ fn main(frame_buffer_config: &'static mut FrameBufferConfig) -> Result<()> {
 }
 
 extern "C" fn mouse_observer(dx: i8, dy: i8) {
-    #[allow(static_mut_refs)]
-    let mouse_corsor = unsafe { MOUSE_CURSOR.as_mut().unwrap() };
-    _ = mouse_corsor.move_relative(Vector2D::new(dx as i32, dy as i32));
+    _ = mouse_cursor().move_relative(Vector2D::new(dx as i32, dy as i32));
 }
 
 #[panic_handler]
