@@ -63,7 +63,6 @@ fn main() {
         .flag("-Wno-unused-parameter")
         .no_default_flags(true)
         .define("__ELF__", None)
-        .flag("-Wno-return-type")
         .cargo_warnings(false)
         .compiler("clang")
         .compile("newlib_support");

@@ -5,7 +5,7 @@ use crate::{
     frame_buffer::{PixelWriter, Rgb},
     pixel_writer,
 };
-use core::ops::Add;
+use core::ops::{Add, AddAssign};
 
 #[derive(Debug, Copy, Clone)]
 pub struct Vector2D<T: Copy + Clone> {
@@ -33,6 +33,15 @@ where
             x: self.x + rhs.x,
             y: self.y + rhs.y,
         }
+    }
+}
+
+impl<T> AddAssign for Vector2D<T>
+where
+    T: Add<Output = T> + Copy + Clone,
+{
+    fn add_assign(&mut self, rhs: Self) {
+        *self = *self + rhs;
     }
 }
 

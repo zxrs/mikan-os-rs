@@ -103,7 +103,7 @@ impl MouseCursor {
 
     pub fn move_relative(&mut self, displacement: Vector2D<i32>) -> Result<()> {
         erace_mouse_cursor(self.pixel_writer, self.position, self.erase_color)?;
-        self.position = self.position + displacement;
+        self.position += displacement;
         draw_mouse_cursor(self.pixel_writer, self.position)?;
         Ok(())
     }
