@@ -1,3 +1,5 @@
+#![allow(unused)]
+
 use crate::{Result, x86};
 
 const CONFIG_ADDRESS: u16 = 0x0cf8;
@@ -157,12 +159,12 @@ pub fn read_bar(device: &Device, bar_index: u32) -> Result<u64> {
         return Ok(bar as _);
     }
 
-    if (bar_index >= 5) {
+    if bar_index >= 5 {
         return Err("index of out of range");
     }
 
     let bar_upper = read_conf_reg(device, addr + 4);
-    Ok(bar as u64 | (bar_upper as u64) << 32)
+    Ok(bar as u64 | ((bar_upper as u64) << 32))
 }
 
 fn calc_bar_address(bar_index: u32) -> u8 {

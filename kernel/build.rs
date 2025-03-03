@@ -49,7 +49,7 @@ fn main() {
         .compiler("clang++")
         .no_default_flags(true)
         .cpp_link_stdlib(None)
-        // .cargo_warnings(false)
+        .cargo_warnings(false)
         .files(files.iter())
         .compile("usb");
 
@@ -60,8 +60,11 @@ fn main() {
         .flag("-ffreestanding")
         .flag("-mno-red-zone")
         .flag("-nostdlibinc")
+        .flag("-Wno-unused-parameter")
         .no_default_flags(true)
         .define("__ELF__", None)
+        .flag("-Wno-return-type")
+        .cargo_warnings(false)
         .compiler("clang")
         .compile("newlib_support");
 

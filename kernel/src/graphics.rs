@@ -1,9 +1,11 @@
+#![allow(unused)]
+
 use crate::{
     Result,
     frame_buffer::{PixelWriter, Rgb},
     pixel_writer,
 };
-use core::ops::{Add, AddAssign};
+use core::ops::Add;
 
 #[derive(Debug, Copy, Clone)]
 pub struct Vector2D<T: Copy + Clone> {

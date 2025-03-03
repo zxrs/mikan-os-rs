@@ -1,5 +1,5 @@
 use crate::{
-    PIXEL_WRITER, Result, Rgb, Vector2D,
+    Result, Rgb, Vector2D,
     frame_buffer::{BGRPixelWriter, PixelWriter},
 };
 
@@ -42,14 +42,14 @@ pub fn draw_mouse_cursor<W: PixelWriter>(
         (0..MOUSE_CURSOR_WIDTH).try_for_each(|dx| {
             if MOUSE_CURSOR_SHAPE[dy].chars().nth(dx).eq(&Some('@')) {
                 pixel_writer.write(
-                    (position.x as i32 + dx as i32) as u32,
-                    (position.y as i32 + dy as i32) as u32,
+                    (position.x + dx as i32) as u32,
+                    (position.y + dy as i32) as u32,
                     Rgb::black(),
                 )
             } else if MOUSE_CURSOR_SHAPE[dy].chars().nth(dx).eq(&Some('.')) {
                 pixel_writer.write(
-                    (position.x as i32 + dx as i32) as u32,
-                    (position.y as i32 + dy as i32) as u32,
+                    (position.x + dx as i32) as u32,
+                    (position.y + dy as i32) as u32,
                     Rgb::white(),
                 )
             } else {
@@ -69,8 +69,8 @@ pub fn erace_mouse_cursor<W: PixelWriter>(
         (0..MOUSE_CURSOR_WIDTH).try_for_each(|dx| {
             if MOUSE_CURSOR_SHAPE[dy].chars().nth(dx).ne(&Some(' ')) {
                 pixel_writer.write(
-                    (position.x as i32 + dx as i32) as u32,
-                    (position.y as i32 + dy as i32) as u32,
+                    (position.x + dx as i32) as u32,
+                    (position.y + dy as i32) as u32,
                     erasr_color,
                 )
             } else {
@@ -88,9 +88,11 @@ pub struct MouseCursor {
 }
 
 impl MouseCursor {
-    pub fn new(erase_color: Rgb, initial_position: Vector2D<i32>) -> Result<Self> {
-        #[allow(static_mut_refs)]
-        let pixel_writer = unsafe { PIXEL_WRITER.as_mut().unwrap() };
+    pub fn new(
+        pixel_writer: &'static mut BGRPixelWriter,
+        erase_color: Rgb,
+        initial_position: Vector2D<i32>,
+    ) -> Result<Self> {
         draw_mouse_cursor(pixel_writer, Vector2D::new(200, 100))?;
         Ok(Self {
             pixel_writer,

@@ -2,7 +2,6 @@
 #![no_std]
 #![no_main]
 
-use core::arch::asm;
 use core::fmt::Write;
 
 #[macro_use]
@@ -32,6 +31,7 @@ use usb::XhciController;
 
 // TODO: should be replaced with safe rust code...
 static mut CONSOLE: Option<Console> = None;
+#[allow(unused)]
 fn console() -> &'static mut Console {
     unsafe {
         #[allow(static_mut_refs)]
@@ -69,7 +69,7 @@ fn main(frame_buffer_config: &'static mut FrameBufferConfig) -> Result<()> {
     let console = Console::new(Rgb::white(), Rgb::black());
     unsafe { CONSOLE = Some(console) };
 
-    let mouse_cursor = MouseCursor::new(Rgb::black(), Vector2D::new(200, 100))?;
+    let mouse_cursor = MouseCursor::new(pixel_writer(), Rgb::black(), Vector2D::new(200, 100))?;
     unsafe { MOUSE_CURSOR = Some(mouse_cursor) };
 
     draw_rectangle(
@@ -121,7 +121,7 @@ fn main(frame_buffer_config: &'static mut FrameBufferConfig) -> Result<()> {
 extern "C" fn mouse_observer(dx: i8, dy: i8) {
     #[allow(static_mut_refs)]
     let mouse_corsor = unsafe { MOUSE_CURSOR.as_mut().unwrap() };
-    mouse_corsor.move_relative(Vector2D::new(dx as i32, dy as i32));
+    _ = mouse_corsor.move_relative(Vector2D::new(dx as i32, dy as i32));
 }
 
 #[panic_handler]

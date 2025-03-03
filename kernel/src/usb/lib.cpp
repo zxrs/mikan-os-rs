@@ -80,4 +80,5 @@ extern "C" void __cxa_pure_virtual() {
 // libcxx_support.cpp depends on printk function
 int printk(const char* format, ...) {
   // noop
+  return 0;
 }
