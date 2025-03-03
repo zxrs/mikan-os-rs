@@ -143,6 +143,7 @@ fn main(frame_buffer_config: &'static mut FrameBufferConfig) -> Result<()> {
     let mut xhc = XhciController::new(xhc_mmio_base as usize);
     xhc.initialize()?;
     xhc.run()?;
+    xhc.configure_port();
     dbg!();
     usb::register_mouse_observer(mouse_observer);
     loop {

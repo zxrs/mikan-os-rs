@@ -2,31 +2,29 @@ use crate::Result;
 
 unsafe extern "C" {
     #[link_name = "\u{1}_ZN3usb4xhci10ControllerC1Em"]
-    pub fn usb_xhci_Controller_Controller(this: *mut usb_xhci_Controller, mmio_base: usize);
-}
+    fn usb_xhci_Controller_Controller(this: *mut UsbXhciController, mmio_base: usize);
 
-unsafe extern "C" {
-    fn UsbXhciController_initialize(c_impl: *mut usb_xhci_Controller) -> i32;
-    fn UsbXhciController_run(c_impl: *mut usb_xhci_Controller) -> i32;
-    fn UsbXhciController_configurePort(c_impl: *mut usb_xhci_Controller);
-    fn UsbXhciController_ProcessXhcEvent(c_impl: *mut usb_xhci_Controller) -> i32;
+    fn UsbXhciController_initialize(c_impl: *mut UsbXhciController) -> i32;
+    fn UsbXhciController_run(c_impl: *mut UsbXhciController) -> i32;
+    fn UsbXhciController_configurePort(c_impl: *mut UsbXhciController);
+    fn UsbXhciController_ProcessXhcEvent(c_impl: *mut UsbXhciController) -> i32;
     fn RegisterMouseObserver(cb: MouseObserver);
 }
 
 #[repr(C)]
 #[derive(Debug)]
-pub struct usb_xhci_Controller {
-    pub mmio_base_: usize,
-    pub cap_: *mut u8,
-    pub op_: *mut u8,
-    pub max_ports_: u8,
-    pub devmgr_: usb_xhci_DeviceManager,
-    pub cr_: usb_xhci_Ring,
-    pub er_: usb_xhci_EventRing,
+struct UsbXhciController {
+    mmio_base_: usize,
+    cap_: *mut u8,
+    op_: *mut u8,
+    max_ports_: u8,
+    devmgr_: UsbXhciDeviceManager,
+    cr_: UsbXhciRing,
+    er_: UsbXhciEventRing,
 }
 
-impl usb_xhci_Controller {
-    pub fn new(mmio_base: usize) -> Self {
+impl UsbXhciController {
+    fn new(mmio_base: usize) -> Self {
         let mut __bindgen_tmp = ::core::mem::MaybeUninit::uninit();
         unsafe { usb_xhci_Controller_Controller(__bindgen_tmp.as_mut_ptr(), mmio_base) };
         unsafe { __bindgen_tmp.assume_init() }
@@ -35,35 +33,35 @@ impl usb_xhci_Controller {
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
-pub struct usb_xhci_DeviceManager {
-    pub device_context_pointers_: *mut *mut u8,
-    pub max_slots_: usize,
-    pub devices_: *mut *mut u8,
+struct UsbXhciDeviceManager {
+    device_context_pointers_: *mut *mut u8,
+    max_slots_: usize,
+    devices_: *mut *mut u8,
 }
 
 #[repr(C)]
 #[derive(Debug)]
-pub struct usb_xhci_Ring {
-    pub buf_: *mut u8,
-    pub buf_size_: usize,
-    pub cycle_bit_: bool,
-    pub write_index_: usize,
+struct UsbXhciRing {
+    buf_: *mut u8,
+    buf_size_: usize,
+    cycle_bit_: bool,
+    write_index_: usize,
 }
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
-pub struct usb_xhci_EventRing {
-    pub buf_: *mut u8,
-    pub buf_size_: usize,
-    pub cycle_bit_: bool,
-    pub erst_: *mut u8,
-    pub interrupter_: *mut u8,
+struct UsbXhciEventRing {
+    buf_: *mut u8,
+    buf_size_: usize,
+    cycle_bit_: bool,
+    erst_: *mut u8,
+    interrupter_: *mut u8,
 }
 
 type MouseObserver = extern "C" fn(i8, i8);
 
 pub struct XhciController {
-    c_impl: usb_xhci_Controller,
+    c_impl: UsbXhciController,
 }
 
 unsafe impl Send for XhciController {}
@@ -71,7 +69,7 @@ unsafe impl Send for XhciController {}
 impl XhciController {
     pub fn new(mmio_base: usize) -> Self {
         Self {
-            c_impl: usb_xhci_Controller::new(mmio_base),
+            c_impl: UsbXhciController::new(mmio_base),
         }
     }
 
