@@ -9,6 +9,21 @@ use core::{fmt, str};
 const ROWS: usize = 25;
 const COLS: usize = 80;
 
+pub static mut CONSOLE: Option<Console> = None;
+
+pub fn init(fg_color: Rgb, bg_color: Rgb) {
+    let console = Console::new(fg_color, bg_color);
+    unsafe { CONSOLE = Some(console) };
+}
+
+#[allow(unused)]
+pub fn console() -> &'static mut Console {
+    unsafe {
+        #[allow(static_mut_refs)]
+        CONSOLE.as_mut().unwrap()
+    }
+}
+
 pub struct Console {
     fg_color: Rgb,
     bg_color: Rgb,

@@ -1,0 +1,2 @@
+[language-server.rust-analyzer]
+environment = { "SKIP_BUILD_SCRIPT" = "true" }

@@ -1,6 +1,19 @@
 use crate::Result;
 use core::slice;
 
+pub static mut PIXEL_WRITER: Option<BGRPixelWriter> = None;
+
+pub fn init(writer: BGRPixelWriter) {
+    unsafe { PIXEL_WRITER = Some(writer) };
+}
+
+pub fn pixel_writer() -> &'static mut BGRPixelWriter {
+    unsafe {
+        #[allow(static_mut_refs)]
+        PIXEL_WRITER.as_mut().unwrap()
+    }
+}
+
 #[allow(unused)]
 pub struct FrameBufferConfig {
     frame_buffer: *mut u8,

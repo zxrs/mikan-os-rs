@@ -9,37 +9,12 @@ mod macros;
 
 r#mod!(fonts, console, frame_buffer, graphics, mouse, pci, x86, usb);
 
-use console::Console;
-use frame_buffer::{BGRPixelWriter, FrameBufferConfig, PixelFormat, Rgb};
+use console::console;
+use frame_buffer::{BGRPixelWriter, FrameBufferConfig, PixelFormat, Rgb, pixel_writer};
 use graphics::{Vector2D, draw_rectangle};
-use mouse::MouseCursor;
+use mouse::mouse_cursor;
 use pci::{DEVICES, read_bar, scan_all_bus};
 use usb::XhciController;
-
-// TODO: should be replaced with safe rust code...
-static mut CONSOLE: Option<Console> = None;
-#[allow(unused)]
-fn console() -> &'static mut Console {
-    unsafe {
-        #[allow(static_mut_refs)]
-        CONSOLE.as_mut().unwrap()
-    }
-}
-static mut PIXEL_WRITER: Option<BGRPixelWriter> = None;
-fn pixel_writer() -> &'static mut BGRPixelWriter {
-    unsafe {
-        #[allow(static_mut_refs)]
-        PIXEL_WRITER.as_mut().unwrap()
-    }
-}
-
-static mut MOUSE_CURSOR: Option<MouseCursor> = None;
-fn mouse_cursor() -> &'static mut MouseCursor {
-    unsafe {
-        #[allow(static_mut_refs)]
-        MOUSE_CURSOR.as_mut().unwrap()
-    }
-}
 
 pub type Result<T> = core::result::Result<T, &'static str>;
 
@@ -57,13 +32,9 @@ fn main(frame_buffer_config: &'static mut FrameBufferConfig) -> Result<()> {
         PixelFormat::BGRR => BGRPixelWriter::new(frame_buffer_config),
         _ => unimplemented!(),
     };
-    unsafe { PIXEL_WRITER = Some(writer) };
-
-    let console = Console::new(Rgb::white(), Rgb::black());
-    unsafe { CONSOLE = Some(console) };
-
-    let mouse_cursor = MouseCursor::new(pixel_writer(), Rgb::black(), Vector2D::new(200, 100))?;
-    unsafe { MOUSE_CURSOR = Some(mouse_cursor) };
+    frame_buffer::init(writer);
+    console::init(Rgb::white(), Rgb::black());
+    mouse::init(Rgb::black(), 200, 100)?;
 
     draw_rectangle(
         &Vector2D::new(100, 100),

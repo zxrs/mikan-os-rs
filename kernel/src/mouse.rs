@@ -1,7 +1,27 @@
 use crate::{
     Result, Rgb, Vector2D,
     frame_buffer::{BGRPixelWriter, PixelWriter},
+    pixel_writer,
 };
+
+pub static mut MOUSE_CURSOR: Option<MouseCursor> = None;
+
+pub fn init(erace_color: Rgb, initial_pos_x: i32, initial_pos_y: i32) -> Result<()> {
+    let mouse_cursor = MouseCursor::new(
+        pixel_writer(),
+        erace_color,
+        Vector2D::new(initial_pos_x, initial_pos_y),
+    )?;
+    unsafe { MOUSE_CURSOR = Some(mouse_cursor) };
+    Ok(())
+}
+
+pub fn mouse_cursor() -> &'static mut MouseCursor {
+    unsafe {
+        #[allow(static_mut_refs)]
+        MOUSE_CURSOR.as_mut().unwrap()
+    }
+}
 
 const MOUSE_CURSOR_WIDTH: usize = 15;
 const MOUSE_CURSOR_HEIGHT: usize = 24;
