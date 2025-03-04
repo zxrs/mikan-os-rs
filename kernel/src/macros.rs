@@ -1,9 +1,6 @@
 macro_rules! print {
     ($($arg:tt)*) => {{
-        #[allow(static_mut_refs)]
-        if let Some(writer) = unsafe { CONSOLE.as_mut() } {
-            write!(writer, "{}", format_args!($($arg)*)).unwrap();
-        }
+        write!(console(), "{}", format_args!($($arg)*)).unwrap();
     }}
 }
 
@@ -31,5 +28,13 @@ macro_rules! dbg {
     }};
     ($($val:expr),+ $(,)?) => {
         ($(dbg!($val)),+,)
+    };
+}
+
+macro_rules! r#mod {
+    ($($arg:tt),+) => {
+        $(
+            mod $arg;
+        )+
     };
 }

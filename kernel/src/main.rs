@@ -7,26 +7,13 @@ use core::fmt::Write;
 #[macro_use]
 mod macros;
 
-mod fonts;
+r#mod!(fonts, console, frame_buffer, graphics, mouse, pci, x86, usb);
 
-mod console;
 use console::Console;
-
-mod frame_buffer;
 use frame_buffer::{BGRPixelWriter, FrameBufferConfig, PixelFormat, Rgb};
-
-mod graphics;
 use graphics::{Vector2D, draw_rectangle};
-
-mod mouse;
 use mouse::MouseCursor;
-
-mod pci;
 use pci::{DEVICES, read_bar, scan_all_bus};
-
-mod x86;
-
-mod usb;
 use usb::XhciController;
 
 // TODO: should be replaced with safe rust code...
