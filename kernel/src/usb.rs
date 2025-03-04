@@ -8,7 +8,22 @@ unsafe extern "C" {
     fn UsbXhciController_run(c_impl: *mut UsbXhciController) -> i32;
     fn UsbXhciController_configurePort(c_impl: *mut UsbXhciController);
     fn UsbXhciController_ProcessXhcEvent(c_impl: *mut UsbXhciController) -> i32;
+    fn UsbXhciController_PrimaryEventRing_HasFront(c_impl: *mut UsbXhciController) -> bool;
     fn RegisterMouseObserver(cb: MouseObserver);
+}
+
+pub static mut XHCI: Option<XhciController> = None;
+
+pub fn init(mmio_base: usize) {
+    let xhci = XhciController::new(mmio_base);
+    unsafe { XHCI = Some(xhci) };
+}
+
+pub fn xhc() -> &'static mut XhciController {
+    #[allow(static_mut_refs)]
+    unsafe {
+        XHCI.as_mut().unwrap()
+    }
 }
 
 #[repr(C)]
@@ -62,6 +77,10 @@ impl XhciController {
 
     pub fn process_event(&mut self) -> i32 {
         unsafe { UsbXhciController_ProcessXhcEvent(&mut self.c_impl) }
+    }
+
+    pub fn process_event_ring_has_front(&mut self) -> bool {
+        unsafe { UsbXhciController_PrimaryEventRing_HasFront(&mut self.c_impl) }
     }
 }
 

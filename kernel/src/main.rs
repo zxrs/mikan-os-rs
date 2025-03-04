@@ -1,4 +1,5 @@
 #![feature(str_from_raw_parts)]
+#![feature(abi_x86_interrupt)]
 #![no_std]
 #![no_main]
 
@@ -7,14 +8,16 @@ use core::fmt::Write;
 #[macro_use]
 mod macros;
 
-r#mod!(fonts, console, frame_buffer, graphics, mouse, pci, x86, usb);
+#[rustfmt::skip]
+r#mod!(fonts, console, frame_buffer, graphics, mouse, pci, x86, usb, interrupt);
 
 use console::console;
 use frame_buffer::{BGRPixelWriter, FrameBufferConfig, PixelFormat, Rgb, pixel_writer};
 use graphics::{Vector2D, draw_rectangle};
+use interrupt::{InterruptFrame, notify_end_of_interrupt};
 use mouse::mouse_cursor;
 use pci::{DEVICES, read_bar, scan_all_bus};
-use usb::XhciController;
+use usb::xhc;
 
 pub type Result<T> = core::result::Result<T, &'static str>;
 
@@ -69,21 +72,26 @@ fn main(frame_buffer_config: &'static mut FrameBufferConfig) -> Result<()> {
         xhc_bar, xhc_mmio_base
     );
 
-    let mut xhc = XhciController::new(xhc_mmio_base as usize);
-    xhc.initialize()?;
-    xhc.run()?;
-    xhc.configure_port();
-    dbg!();
+    usb::init(xhc_mmio_base as usize);
+    xhc().initialize()?;
+    xhc().run()?;
+    xhc().configure_port();
     usb::register_mouse_observer(mouse_observer);
-    loop {
-        xhc.process_event();
-    }
 
     Ok(())
 }
 
 extern "C" fn mouse_observer(dx: i8, dy: i8) {
     _ = mouse_cursor().move_relative(Vector2D::new(dx as i32, dy as i32));
+}
+
+extern "x86-interrupt" fn interrupt_handler_xhci(frame: &InterruptFrame) {
+    while xhc().process_event_ring_has_front() {
+        if xhc().process_event() > 0 {
+            dbg!();
+        }
+    }
+    notify_end_of_interrupt();
 }
 
 #[panic_handler]
