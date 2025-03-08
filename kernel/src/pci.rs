@@ -1,12 +1,13 @@
-#![allow(unused)]
+// #![allow(unused)]
 
+use crate::{Result, console, x86};
 use bit_field::BitField;
-
-use crate::{Result, x86};
+use core::fmt::Write;
 
 const CONFIG_ADDRESS: u16 = 0x0cf8;
 const CONFIG_DATA: u16 = 0x0cfc;
 
+#[allow(unused)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MSITriggerMode {
     Edge,
@@ -16,6 +17,7 @@ pub enum MSITriggerMode {
 #[derive(Debug, Clone, Copy)]
 pub struct MSIDeliveryMode(u8);
 
+#[allow(unused)]
 #[allow(non_snake_case)]
 impl MSIDeliveryMode {
     const FIXED: u8 = 0b000;
@@ -50,6 +52,7 @@ impl MSIDeliveryMode {
     }
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Default, Clone, Copy)]
 pub struct Device {
     pub bus: u8,
@@ -74,6 +77,7 @@ pub struct MSICapability {
 #[derive(Debug, Default, Clone, Copy)]
 pub struct MSICapabilityHeader(u32);
 
+#[allow(dead_code)]
 impl MSICapabilityHeader {
     fn data(&self) -> u32 {
         self.0
@@ -100,11 +104,11 @@ impl MSICapabilityHeader {
     }
 
     fn set_multi_msg_enable(&mut self, value: u8) {
-        self.0.set_bits(17..20, value as u32);
+        self.0.set_bits(20..23, value as u32);
     }
 }
 
-pub static mut DEVICES: [Device; 32] = unsafe { core::mem::zeroed() };
+pub static mut DEVICES: [Option<Device>; 32] = [None; 32];
 
 pub fn scan_all_bus() -> Result<()> {
     let header_type = read_header_type(0, 0, 0);
@@ -123,9 +127,11 @@ fn scan_bus(bus: u8) -> Result<()> {
 }
 
 fn read_msi_capability(dev: &Device, cap_addr: u8) -> MSICapability {
-    let mut msi_cap = MSICapability::default();
-    msi_cap.header = MSICapabilityHeader(read_conf_reg(dev, cap_addr));
-    msi_cap.msg_addr = read_conf_reg(dev, cap_addr + 4);
+    let mut msi_cap = MSICapability {
+        header: MSICapabilityHeader(read_conf_reg(dev, cap_addr)),
+        msg_addr: read_conf_reg(dev, cap_addr + 4),
+        ..Default::default()
+    };
 
     let mut msg_data_addr = cap_addr + 8;
     if msi_cap.header.addr_64_capable() > 0 {
@@ -135,7 +141,7 @@ fn read_msi_capability(dev: &Device, cap_addr: u8) -> MSICapability {
 
     msi_cap.msg_data = read_conf_reg(dev, msg_data_addr);
 
-    if msi_cap.header.per_vector_mask_capable() > 0 {
+    if msi_cap.header.per_vector_mask_capable() {
         msi_cap.mask_bits = read_conf_reg(dev, msg_data_addr + 4);
         msi_cap.pending_bits = read_conf_reg(dev, msg_data_addr + 8);
     }
@@ -155,13 +161,13 @@ fn write_msi_capability(dev: &Device, cap_addr: u8, msi_cap: &MSICapability) {
 
     write_conf_reg(dev, msg_data_addr, msi_cap.msg_data);
 
-    if msi_cap.header.per_vector_mask_capable() > 0 {
+    if msi_cap.header.per_vector_mask_capable() {
         write_conf_reg(dev, msg_data_addr + 4, msi_cap.mask_bits);
         write_conf_reg(dev, msg_data_addr + 8, msi_cap.pending_bits);
     }
 }
 
-fn configure_msi_resiter(
+fn configure_msi_register(
     dev: &Device,
     cap_addr: u8,
     msg_addr: u32,
@@ -180,7 +186,7 @@ fn configure_msi_resiter(
             .set_multi_msg_enable(num_vector_exponent as _);
     }
 
-    msi_cap.header.set_msi_enable(1);
+    msi_cap.header.set_msi_enable(true);
     msi_cap.msg_addr = msg_addr;
     msi_cap.msg_data = msg_data;
 
@@ -193,15 +199,17 @@ fn configure_msi_resiter(
 struct CapabilityHeader(u32);
 
 impl CapabilityHeader {
-    const CAP_ID_MASK: u32 = 0b0000_0000_0000_0000_0000_0000_1111_1111;
-    const NEXT_PTR_MASK: u32 = 0b0000_0000_0000_0000_1111_1111_0000_0000;
-
     fn cap_id(&self) -> u8 {
-        (self.0 | Self::CAP_ID_MASK) as _
+        self.0.get_bits(0..8) as u8
     }
 
     fn next_ptr(&self) -> u8 {
-        (self.0 | Self::NEXT_PTR_MASK) as _
+        self.0.get_bits(8..18) as u8
+    }
+
+    #[allow(dead_code)]
+    fn cap(&self) -> u16 {
+        self.0.get_bits(16..) as u16
     }
 }
 
@@ -231,14 +239,14 @@ fn configure_msi(
         cap_addr = header.next_ptr();
     }
     if msi_cap_addr > 0 {
-        return configure_msi_resiter(dev, msi_cap_addr, msg_addr, msg_data, num_vector_exponent);
+        return configure_msi_register(dev, msi_cap_addr, msg_addr, msg_data, num_vector_exponent);
     } else if msix_cap_addr > 0 {
         return Err("not implemented.");
     }
     Err("no pci msi.")
 }
 
-pub fn configure_msi_fixed_destication(
+pub fn configure_msi_fixed_destination(
     dev: &Device,
     apic_id: u8,
     trigger_mode: MSITriggerMode,
@@ -246,13 +254,12 @@ pub fn configure_msi_fixed_destication(
     vector: u8,
     num_vector_exponent: u32,
 ) -> Result<()> {
-    let msg_addr = 0xfee0000 | ((apic_id as u32) << 12);
+    let msg_addr = 0xfee0_0000 | ((apic_id as u32) << 12);
     let mut msg_data = ((delivery_mode.0 as u32) << 8) | vector as u32;
     if trigger_mode == MSITriggerMode::Level {
         msg_data |= 0xc000;
     }
-    configure_msi(dev, msg_addr, msg_data, num_vector_exponent)?;
-    Ok(())
+    configure_msi(dev, msg_addr, msg_data, num_vector_exponent)
 }
 
 fn scan_function(bus: u8, device: u8, function: u8) -> Result<()> {
@@ -326,6 +333,7 @@ fn read_data() -> u32 {
     x86::io_in32(CONFIG_DATA)
 }
 
+#[allow(dead_code)]
 pub fn read_vendor_id_from_device(dev: &Device) -> u16 {
     read_device_id(dev.bus, dev.device, dev.function)
 }
@@ -335,6 +343,7 @@ fn read_vendor_id(bus: u8, device: u8, function: u8) -> u16 {
     read_data() as _
 }
 
+#[allow(dead_code)]
 fn read_device_id(bus: u8, device: u8, function: u8) -> u16 {
     write_address(make_address(bus, device, function, 0x00));
     (read_data() >> 16) as _

@@ -14,6 +14,10 @@ pub fn io_in32(addr: u16) -> u32 {
     a
 }
 
+pub fn sti() {
+    unsafe { asm!("sti") };
+}
+
 pub fn get_cs() -> u16 {
     let a;
     unsafe { asm!("mov {0:x}, cs", out(reg) a) };

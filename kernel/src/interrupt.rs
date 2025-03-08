@@ -1,5 +1,4 @@
 use bit_field::BitField;
-use core::ptr;
 
 pub static mut IDT: [InterruptDescriptor; 256] = unsafe { core::mem::zeroed() };
 
@@ -92,54 +91,6 @@ impl From<u16> for DescriptorType {
 #[derive(Debug, Default, Clone, Copy)]
 pub struct InterruptDescriptorAttribute(u16);
 
-#[allow(unused)]
-impl InterruptDescriptorAttribute {
-    const DESCRIPTOR_TYPE_MASK: u16 = 0b0000_0000_1111_0000;
-    const DESCRIPTOR_PRIVILAGE_LEVEL_MASK: u16 = 0b0111_0000_0000_0000;
-    const PRESENT: u16 = 0b1000_0000_0000_0000;
-
-    pub fn interrupt_stack_table(&self) -> u16 {
-        self.0.get_bits(0..3)
-    }
-
-    pub fn set_interrupt_stack_table(&mut self, value: u16) {
-        self.set(Self::INTERRUPT_STACK_TABLE_MASK, value);
-    }
-
-    pub fn descriptor_type(&self) -> DescriptorType {
-        self.get(Self::DESCRIPTOR_TYPE_MASK).into()
-    }
-
-    pub fn set_descriptor_type(&mut self, value: DescriptorType) {
-        self.set(Self::DESCRIPTOR_TYPE_MASK, value.0);
-    }
-
-    pub fn descriptor_privilage_level(&self) -> u16 {
-        self.get(Self::DESCRIPTOR_PRIVILAGE_LEVEL_MASK)
-    }
-
-    pub fn set_descriptor_privilage_level(&mut self, value: u16) {
-        self.set(Self::DESCRIPTOR_PRIVILAGE_LEVEL_MASK, value);
-    }
-
-    pub fn present(&self) -> bool {
-        self.get(Self::PRESENT) > 0
-    }
-
-    pub fn set_present(&mut self, value: bool) {
-        let value = if value { Self::PRESENT } else { 0 };
-        self.set(Self::PRESENT, value);
-    }
-
-    fn get(&self, mask: u16) -> u16 {
-        self.0 & mask
-    }
-
-    fn set(&mut self, mask: u16, value: u16) {
-        self.0 = (self.0 | !mask) & (value & mask);
-    }
-}
-
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct InterruptFrame {
@@ -151,7 +102,8 @@ pub struct InterruptFrame {
 }
 
 pub fn notify_end_of_interrupt() {
-    unsafe { ptr::null_mut::<u32>().offset(0xfee000b0).write_volatile(0) };
+    let p = 0xfee000b0 as *mut u32;
+    unsafe { p.write_volatile(0) };
 }
 
 pub fn set_idt_entry(
@@ -173,10 +125,11 @@ pub fn make_idt_attr(
     present: bool,
     interrupt_stack_table: u16,
 ) -> InterruptDescriptorAttribute {
-    let mut attr = InterruptDescriptorAttribute::default();
-    attr.set_interrupt_stack_table(interrupt_stack_table);
-    attr.set_descriptor_type(descriptor_type);
-    attr.set_descriptor_privilage_level(descriptor_privilage_level);
-    attr.set_present(present);
-    attr
+    let mut field = 0;
+    field
+        .set_bit(15, present)
+        .set_bits(13..15, descriptor_privilage_level)
+        .set_bits(8..12, descriptor_type.0)
+        .set_bits(0..3, interrupt_stack_table);
+    InterruptDescriptorAttribute(field)
 }

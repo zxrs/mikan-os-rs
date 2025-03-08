@@ -15,8 +15,8 @@ use console::console;
 use frame_buffer::{BGRPixelWriter, FrameBufferConfig, PixelFormat, Rgb, pixel_writer};
 use graphics::{Vector2D, draw_rectangle};
 use interrupt::{
-    DescriptorType, IDT, InterruptFrame, InterruptVector, make_idt_attr, notify_end_of_interrupt,
-    set_idt_entry,
+    DescriptorType, IDT, InterruptDescriptor, InterruptFrame, InterruptVector, make_idt_attr,
+    notify_end_of_interrupt, set_idt_entry,
 };
 use mouse::mouse_cursor;
 use pci::{DEVICES, read_bar, scan_all_bus};
@@ -72,21 +72,21 @@ fn main(frame_buffer_config: &'static mut FrameBufferConfig) -> Result<()> {
     set_idt_entry(
         unsafe { &mut IDT[InterruptVector::Xhci().get()] },
         attr,
-        interrupt_handler_xhci as u64,
+        interrupt_handler_xhci as usize as u64,
         cs,
     );
 
     #[allow(static_mut_refs)]
     let param = x86::IdtParam {
-        limit: size_of_val(unsafe { &IDT }) as u16 - 1,
-        base: unsafe { IDT.as_ptr().addr() },
+        limit: size_of::<[InterruptDescriptor; 256]>() as u16 - 1,
+        base: unsafe { &IDT[0] as *const InterruptDescriptor as usize },
     };
     x86::load_idt(&param);
 
-    let bsp_local_apic_id = (unsafe { *core::ptr::null_mut::<u32>().add(0xfee00020) } >> 24) as u8;
+    let bsp_local_apic_id = (unsafe { *(0xfee00020 as *const u32) } >> 24) as u8;
     dbg!(bsp_local_apic_id);
 
-    pci::configure_msi_fixed_destication(
+    pci::configure_msi_fixed_destination(
         &xhc_dev,
         bsp_local_apic_id,
         pci::MSITriggerMode::Level,
@@ -107,8 +107,11 @@ fn main(frame_buffer_config: &'static mut FrameBufferConfig) -> Result<()> {
     let xhc = xhc();
     xhc.initialize()?;
     xhc.run()?;
-    xhc.configure_port();
+
+    x86::sti();
+
     usb::register_mouse_observer(mouse_observer);
+    xhc.configure_port();
 
     Ok(())
 }
@@ -117,7 +120,7 @@ extern "C" fn mouse_observer(dx: i8, dy: i8) {
     _ = mouse_cursor().move_relative(Vector2D::new(dx as i32, dy as i32));
 }
 
-extern "x86-interrupt" fn interrupt_handler_xhci(frame: &InterruptFrame) {
+extern "x86-interrupt" fn interrupt_handler_xhci(_: InterruptFrame) {
     let xhc = xhc();
     while xhc.process_event_ring_has_front() {
         if xhc.process_event() > 0 {
