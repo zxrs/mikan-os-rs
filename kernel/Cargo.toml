@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+bit_field = "0.10"
 
 [build-dependencies]
 cc = "1.2"

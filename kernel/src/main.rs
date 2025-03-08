@@ -14,7 +14,10 @@ r#mod!(fonts, console, frame_buffer, graphics, mouse, pci, x86, usb, interrupt);
 use console::console;
 use frame_buffer::{BGRPixelWriter, FrameBufferConfig, PixelFormat, Rgb, pixel_writer};
 use graphics::{Vector2D, draw_rectangle};
-use interrupt::{InterruptFrame, notify_end_of_interrupt};
+use interrupt::{
+    DescriptorType, IDT, InterruptFrame, InterruptVector, make_idt_attr, notify_end_of_interrupt,
+    set_idt_entry,
+};
 use mouse::mouse_cursor;
 use pci::{DEVICES, read_bar, scan_all_bus};
 use usb::xhc;
@@ -64,6 +67,34 @@ fn main(frame_buffer_config: &'static mut FrameBufferConfig) -> Result<()> {
 
     dbg!(&xhc_dev);
 
+    let cs = x86::get_cs();
+    let attr = make_idt_attr(DescriptorType::InterruptGate(), 0, true, 0);
+    set_idt_entry(
+        unsafe { &mut IDT[InterruptVector::Xhci().get()] },
+        attr,
+        interrupt_handler_xhci as u64,
+        cs,
+    );
+
+    #[allow(static_mut_refs)]
+    let param = x86::IdtParam {
+        limit: size_of_val(unsafe { &IDT }) as u16 - 1,
+        base: unsafe { IDT.as_ptr().addr() },
+    };
+    x86::load_idt(&param);
+
+    let bsp_local_apic_id = (unsafe { *core::ptr::null_mut::<u32>().add(0xfee00020) } >> 24) as u8;
+    dbg!(bsp_local_apic_id);
+
+    pci::configure_msi_fixed_destication(
+        &xhc_dev,
+        bsp_local_apic_id,
+        pci::MSITriggerMode::Level,
+        pci::MSIDeliveryMode::Fixed(),
+        InterruptVector::Xhci().get() as u8,
+        0,
+    )?;
+
     let xhc_bar = read_bar(&xhc_dev, 0)?;
     let xhc_mmio_base = xhc_bar & !0xf;
 
@@ -73,9 +104,10 @@ fn main(frame_buffer_config: &'static mut FrameBufferConfig) -> Result<()> {
     );
 
     usb::init(xhc_mmio_base as usize);
-    xhc().initialize()?;
-    xhc().run()?;
-    xhc().configure_port();
+    let xhc = xhc();
+    xhc.initialize()?;
+    xhc.run()?;
+    xhc.configure_port();
     usb::register_mouse_observer(mouse_observer);
 
     Ok(())
@@ -86,8 +118,9 @@ extern "C" fn mouse_observer(dx: i8, dy: i8) {
 }
 
 extern "x86-interrupt" fn interrupt_handler_xhci(frame: &InterruptFrame) {
-    while xhc().process_event_ring_has_front() {
-        if xhc().process_event() > 0 {
+    let xhc = xhc();
+    while xhc.process_event_ring_has_front() {
+        if xhc.process_event() > 0 {
             dbg!();
         }
     }
