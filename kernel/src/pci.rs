@@ -1,8 +1,7 @@
 // #![allow(unused)]
 
-use crate::{Result, console, x86};
+use crate::{Result, x86};
 use bit_field::BitField;
-use core::fmt::Write;
 
 const CONFIG_ADDRESS: u16 = 0x0cf8;
 const CONFIG_DATA: u16 = 0x0cfc;

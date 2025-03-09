@@ -9,7 +9,7 @@ use core::fmt::Write;
 mod macros;
 
 #[rustfmt::skip]
-r#mod!(fonts, console, frame_buffer, graphics, mouse, pci, x86, usb, interrupt);
+r#mod!(fonts, console, frame_buffer, graphics, mouse, pci, x86, usb, interrupt, queue);
 
 use console::console;
 use frame_buffer::{BGRPixelWriter, FrameBufferConfig, PixelFormat, Rgb, pixel_writer};
@@ -20,9 +20,26 @@ use interrupt::{
 };
 use mouse::mouse_cursor;
 use pci::{DEVICES, read_bar, scan_all_bus};
+use queue::ArrayQueue;
 use usb::xhc;
 
-pub type Result<T> = core::result::Result<T, &'static str>;
+type Result<T> = core::result::Result<T, &'static str>;
+
+static mut MAIN_QUEUE: ArrayQueue<Message, 32> = ArrayQueue::new();
+fn main_queue() -> &'static mut ArrayQueue<Message, 32> {
+    #[allow(static_mut_refs)]
+    unsafe {
+        &mut MAIN_QUEUE
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+struct Message(MessageType);
+
+#[derive(Debug, Clone, Copy)]
+enum MessageType {
+    InterruptXhci,
+}
 
 #[unsafe(no_mangle)]
 extern "C" fn kernel_main(frame_buffer_config: &'static mut FrameBufferConfig) -> ! {
@@ -113,6 +130,31 @@ fn main(frame_buffer_config: &'static mut FrameBufferConfig) -> Result<()> {
     usb::register_mouse_observer(mouse_observer);
     xhc.configure_port();
 
+    loop {
+        x86::cli();
+        if main_queue().count() == 0 {
+            x86::sti();
+            x86::halt();
+            continue;
+        }
+
+        let msg = main_queue().front();
+        _ = main_queue().pop();
+        x86::sti();
+
+        match msg.0 {
+            MessageType::InterruptXhci => {
+                while xhc.process_event_ring_has_front() {
+                    let _e = xhc.process_event();
+                    // dbg!(e);
+                }
+            }
+            msg => {
+                dbg!("unknown message type:", msg);
+            }
+        }
+    }
+
     Ok(())
 }
 
@@ -121,12 +163,7 @@ extern "C" fn mouse_observer(dx: i8, dy: i8) {
 }
 
 extern "x86-interrupt" fn interrupt_handler_xhci(_: InterruptFrame) {
-    let xhc = xhc();
-    while xhc.process_event_ring_has_front() {
-        if xhc.process_event() > 0 {
-            dbg!();
-        }
-    }
+    _ = main_queue().push(Message(MessageType::InterruptXhci));
     notify_end_of_interrupt();
 }
 
