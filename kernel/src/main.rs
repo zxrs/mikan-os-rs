@@ -9,7 +9,7 @@ use core::fmt::Write;
 mod macros;
 
 #[rustfmt::skip]
-r#mod!(fonts, console, frame_buffer, graphics, mouse, pci, x86, usb, interrupt, queue);
+r#mod!(fonts, console, frame_buffer, graphics, mouse, pci, usb, interrupt, queue);
 
 use console::console;
 use frame_buffer::{BGRPixelWriter, FrameBufferConfig, PixelFormat, Rgb, pixel_writer};
@@ -21,9 +21,24 @@ use interrupt::{
 use mouse::mouse_cursor;
 use pci::{DEVICES, read_bar, scan_all_bus};
 use queue::ArrayQueue;
+use share::{
+    memory_map::{self, MemoryDescriptorVisitor, MemoryMap, memory_map},
+    x86,
+};
 use usb::xhc;
 
 type Result<T> = core::result::Result<T, &'static str>;
+
+#[repr(align(16))]
+struct KernelMainStack([u8; 1024 * 1024]);
+
+static mut KERNEL_MAIN_STACK: KernelMainStack = KernelMainStack([0; 1024 * 1024]);
+fn kernel_main_stack() -> &'static KernelMainStack {
+    #[allow(static_mut_refs)]
+    unsafe {
+        &mut KERNEL_MAIN_STACK
+    }
+}
 
 static mut MAIN_QUEUE: ArrayQueue<Message, 32> = ArrayQueue::new();
 fn main_queue() -> &'static mut ArrayQueue<Message, 32> {
@@ -42,14 +57,10 @@ enum MessageType {
 }
 
 #[unsafe(no_mangle)]
-extern "C" fn kernel_main(frame_buffer_config: &'static mut FrameBufferConfig) -> ! {
-    main(frame_buffer_config).unwrap();
-    loop {
-        x86::halt();
-    }
-}
-
-fn main(frame_buffer_config: &'static mut FrameBufferConfig) -> Result<()> {
+extern "C" fn kernel_main(
+    frame_buffer_config: &'static mut FrameBufferConfig,
+    memory_map_: &'static MemoryMap,
+) -> ! {
     frame_buffer_config.frame_buffer().fill(0);
     let writer = match frame_buffer_config.pixel_format {
         PixelFormat::BGRR => BGRPixelWriter::new(frame_buffer_config),
@@ -57,7 +68,31 @@ fn main(frame_buffer_config: &'static mut FrameBufferConfig) -> Result<()> {
     };
     frame_buffer::init(writer);
     console::init(Rgb::white(), Rgb::black());
-    mouse::init(Rgb::black(), 200, 100)?;
+    mouse::init(Rgb::black(), 200, 100).unwrap();
+    memory_map::init(memory_map_);
+
+    x86::switch_rsp(
+        kernel_main_stack() as *const KernelMainStack as usize + 1024 * 1024,
+        kernel_main_new_stack,
+    );
+
+    loop {
+        x86::halt();
+    }
+}
+
+fn kernel_main_new_stack() -> ! {
+    main().unwrap();
+    loop {
+        x86::halt();
+    }
+}
+
+fn main() -> Result<()> {
+    let visitor = MemoryDescriptorVisitor::new(memory_map());
+    visitor.for_each(|d| {
+        dbg!(d.typ);
+    });
 
     draw_rectangle(
         &Vector2D::new(100, 100),

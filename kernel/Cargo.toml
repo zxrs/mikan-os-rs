@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 bit_field = "0.10"
+share = { path = "../share" }
 
 [build-dependencies]
 cc = "1.2"

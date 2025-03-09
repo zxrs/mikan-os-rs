@@ -1,6 +1,7 @@
 use core::char::{REPLACEMENT_CHARACTER, decode_utf16};
 use core::fmt;
 use core::ptr;
+pub use share::memory_map::*;
 
 pub type Result<T> = core::result::Result<T, &'static str>;
 
@@ -249,29 +250,6 @@ pub enum EFIAllocateType {
     MaxAllocateType,
 }
 
-#[allow(unused)]
-#[repr(C)]
-#[derive(Debug, Clone, Copy)]
-pub enum EFIMemoryType {
-    ReservedMemoryType = 0,
-    LoaderCode,
-    LoaderData,
-    BootServicesCode,
-    BootServicesData,
-    RuntimeServicesCode,
-    RuntimeServicesData,
-    ConventionalMemory,
-    UnusableMemory,
-    ACPIReclaimMemory,
-    ACPIMemoryNVS,
-    MemoryMappedIO,
-    MemoryMappedIOPortSpace,
-    PalCode,
-    PersistentMemory,
-    UnacceptedMemoryType,
-    MaxMemoryType,
-}
-
 pub type EFIPhysicalAddress = u64;
 
 /// [4.4.1. EFI_BOOT_SERVICES](https://uefi.org/specs/UEFI/2.11/04_EFI_System_Table.html#efi-boot-services)
@@ -318,8 +296,6 @@ const _: () = {
     ["open_protocol"][offset_of!(EFIBootServices, open_protocol) - 280];
     ["locate_protocol"][offset_of!(EFIBootServices, locate_protocol) - 320];
 };
-
-const MEMORY_MAP_SIZE: usize = 4096 * 4;
 
 impl EFIBootServices {
     const EFI_OPEN_PROTOCOL_BY_HANDLE_PROTOCOL: u32 = 0x00000001;
@@ -409,72 +385,6 @@ impl EFIBootServices {
     // pub fn set_mem(&self, buffer: &mut [u8], value: u8) -> Result<()> {
     //     (self.set_mem)(buffer.as_mut_ptr(), buffer.len(), value).ok()
     // }
-}
-
-/// [7.2.3. EFI_BOOT_SERVICES.GetMemoryMap()](https://uefi.org/specs/UEFI/2.11/07_Services_Boot_Services.html#efi-boot-services-getmemorymap)
-#[repr(C)]
-#[derive(Debug, Default, Clone, Copy)]
-pub struct EFIMemoryDescriptor {
-    typ: u32,
-    physical_start: u64,
-    virtual_start: u64,
-    number_of_pages: u64,
-    attribute: u64,
-}
-
-#[derive(Debug)]
-pub struct MemoryMap {
-    pub size: usize,
-    pub buf: [u8; MEMORY_MAP_SIZE],
-    pub map_key: usize,
-    pub descriptor_size: usize,
-    pub version: u32,
-}
-
-impl Default for MemoryMap {
-    fn default() -> Self {
-        Self {
-            size: MEMORY_MAP_SIZE,
-            buf: [0; MEMORY_MAP_SIZE],
-            map_key: 0,
-            descriptor_size: 0,
-            version: 0,
-        }
-    }
-}
-
-#[derive(Debug)]
-pub struct MemoryDescriptorVisitor<'a> {
-    memory_map: &'a MemoryMap,
-    offset: usize,
-}
-
-impl<'a> MemoryDescriptorVisitor<'a> {
-    pub fn new(memory_map: &'a MemoryMap) -> Self {
-        Self {
-            memory_map,
-            offset: 0,
-        }
-    }
-}
-
-impl Iterator for MemoryDescriptorVisitor<'_> {
-    type Item = EFIMemoryDescriptor;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.offset > self.memory_map.size - self.memory_map.descriptor_size {
-            return None;
-        }
-
-        let descriptor = self
-            .memory_map
-            .buf
-            .get(self.offset)
-            .map(|p| unsafe { *(p as *const u8 as *const EFIMemoryDescriptor) });
-
-        self.offset += self.memory_map.descriptor_size;
-        descriptor
-    }
 }
 
 /// [12.9.2. EFI_GRAPHICS_OUTPUT_PROTOCOL](https://uefi.org/specs/UEFI/2.11/12_Protocols_Console_Support.html#efi-graphics-output-protocol)

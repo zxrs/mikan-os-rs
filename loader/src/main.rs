@@ -13,9 +13,14 @@ static mut WRITER: Option<EFISimpleTextOutputProtocolWriter<'_>> = None;
 mod macros;
 //mod cube;
 mod elf;
-use elf::{Elf64_Ehdr, calc_load_address_range, copy_load_segments};
 mod uefi;
-mod x86;
+
+use elf::{Elf64_Ehdr, calc_load_address_range, copy_load_segments};
+use share::{
+    frame_buffer::{FrameBufferConfig, PixelFormat},
+    memory_map::MemoryMap,
+    x86,
+};
 use uefi::{
     CChar, EFIAllocateType, EFIFileInfo, EFIGraphicsOutputProtocol, EFIHandle,
     EFILoadedImageProtocol, EFIMemoryType, EFISimpleFileSystemProtocol,
@@ -125,21 +130,6 @@ fn efi_main(image_handle: EFIHandle, system_table: &'static EFISystemTable) -> !
             .unwrap();
     }
 
-    #[allow(dead_code)]
-    struct FrameBufferConfig {
-        frame_buffer: *mut u8,
-        pixels_per_scan_line: u32,
-        horizontal_resolution: u32,
-        vertical_resolution: u32,
-        pixel_format: PixelFormat,
-    }
-
-    #[allow(clippy::upper_case_acronyms)]
-    enum PixelFormat {
-        RGBR, // red. green, blue, reserved
-        BGRR, // blue, greem, red, reserved
-    }
-
     let config = FrameBufferConfig {
         frame_buffer: graphics_output.mode.frame_buffer_base as _,
         pixels_per_scan_line: graphics_output.mode.info.pixels_per_scan_line,
@@ -153,11 +143,11 @@ fn efi_main(image_handle: EFIHandle, system_table: &'static EFISystemTable) -> !
     };
 
     let entry_point = unsafe {
-        core::mem::transmute::<*const u8, extern "sysv64" fn(&FrameBufferConfig)>(
+        core::mem::transmute::<*const u8, extern "sysv64" fn(&FrameBufferConfig, &MemoryMap)>(
             kernel_ehdr.entry_addr() as *const u8,
         )
     };
-    entry_point(&config);
+    entry_point(&config, &memory_map);
 
     // cube::rotate(system_table, frame_buffer);
 

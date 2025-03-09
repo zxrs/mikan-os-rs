@@ -1,5 +1,5 @@
 use crate::Result;
-use core::slice;
+pub use share::frame_buffer::{FrameBufferConfig, PixelFormat};
 
 pub static mut PIXEL_WRITER: Option<BGRPixelWriter> = None;
 
@@ -12,34 +12,6 @@ pub fn pixel_writer() -> &'static mut BGRPixelWriter {
         #[allow(static_mut_refs)]
         PIXEL_WRITER.as_mut().unwrap()
     }
-}
-
-#[allow(unused)]
-pub struct FrameBufferConfig {
-    frame_buffer: *mut u8,
-    pixels_per_scan_line: u32,
-    pub horizontal_resolution: u32,
-    pub vertical_resolution: u32,
-    pub pixel_format: PixelFormat,
-}
-
-impl FrameBufferConfig {
-    pub fn frame_buffer(&mut self) -> &mut [u8] {
-        unsafe {
-            slice::from_raw_parts_mut(
-                self.frame_buffer,
-                (self.horizontal_resolution * self.vertical_resolution * 4) as usize,
-            )
-        }
-    }
-}
-
-#[allow(unused)]
-#[allow(clippy::upper_case_acronyms)]
-#[derive(Debug, Clone, Copy)]
-pub enum PixelFormat {
-    RGBR, // red. green, blue, reserved
-    BGRR, // blue, greem, red, reserved
 }
 
 pub trait PixelWriter {
