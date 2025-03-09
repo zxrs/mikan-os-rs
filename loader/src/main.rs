@@ -3,6 +3,7 @@
 #![no_std]
 #![no_main]
 
+use core::arch::asm;
 use core::fmt::Write;
 use core::slice;
 use utf16_lit::utf16_null as w;
@@ -19,7 +20,6 @@ use elf::{Elf64_Ehdr, calc_load_address_range, copy_load_segments};
 use share::{
     frame_buffer::{FrameBufferConfig, PixelFormat},
     memory_map::MemoryMap,
-    x86,
 };
 use uefi::{
     CChar, EFIAllocateType, EFIFileInfo, EFIGraphicsOutputProtocol, EFIHandle,
@@ -159,6 +159,6 @@ fn panic(info: &core::panic::PanicInfo) -> ! {
     println!("PANIC!!!!!");
     println!("{info}");
     loop {
-        x86::halt();
+        unsafe { asm!("hlt") };
     }
 }

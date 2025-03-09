@@ -1,3 +1,4 @@
+use crate::DescriptorType;
 use bit_field::BitField;
 
 pub static mut IDT: [InterruptDescriptor; 256] = unsafe { core::mem::zeroed() };
@@ -34,56 +35,6 @@ impl From<usize> for InterruptVector {
 impl InterruptVector {
     pub fn get(&self) -> usize {
         self.0
-    }
-}
-
-#[repr(transparent)]
-#[derive(Debug, Clone, Copy)]
-pub struct DescriptorType(u16);
-
-#[allow(non_snake_case)]
-#[allow(unused)]
-impl DescriptorType {
-    const UPPER_BYTES: u16 = 0;
-    const LDT: u16 = 2;
-    const TSS_AVAILABLE: u16 = 9;
-    const TSS_BUSY: u16 = 11;
-    const CALL_GATE: u16 = 12;
-    const INTERRUPT_GATE: u16 = 14;
-    const TRAP_GATE: u16 = 15;
-
-    pub fn UpperBytes() -> Self {
-        Self(Self::UPPER_BYTES)
-    }
-
-    pub fn Ldt() -> Self {
-        Self(Self::LDT)
-    }
-
-    pub fn TssAvailable() -> Self {
-        Self(Self::TSS_AVAILABLE)
-    }
-
-    pub fn TssBusy() -> Self {
-        Self(Self::TSS_BUSY)
-    }
-
-    pub fn CallGate() -> Self {
-        Self(Self::CALL_GATE)
-    }
-
-    pub fn InterruptGate() -> Self {
-        Self(Self::INTERRUPT_GATE)
-    }
-
-    pub fn TrapGate() -> Self {
-        Self(Self::TRAP_GATE)
-    }
-}
-
-impl From<u16> for DescriptorType {
-    fn from(value: u16) -> Self {
-        DescriptorType(value)
     }
 }
 
@@ -129,7 +80,7 @@ pub fn make_idt_attr(
     field
         .set_bit(15, present)
         .set_bits(13..15, descriptor_privilage_level)
-        .set_bits(8..12, descriptor_type.0)
+        .set_bits(8..12, descriptor_type.to_u16())
         .set_bits(0..3, interrupt_stack_table);
     InterruptDescriptorAttribute(field)
 }

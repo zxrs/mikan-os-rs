@@ -9,23 +9,23 @@ use core::fmt::Write;
 mod macros;
 
 #[rustfmt::skip]
-r#mod!(fonts, console, frame_buffer, graphics, mouse, pci, usb, interrupt, queue);
+r#mod!(fonts, console, frame_buffer, graphics, mouse, pci, usb, interrupt, queue, segment, x86, x86_descriptor, paging);
 
 use console::console;
 use frame_buffer::{BGRPixelWriter, FrameBufferConfig, PixelFormat, Rgb, pixel_writer};
 use graphics::{Vector2D, draw_rectangle};
 use interrupt::{
-    DescriptorType, IDT, InterruptDescriptor, InterruptFrame, InterruptVector, make_idt_attr,
+    IDT, InterruptDescriptor, InterruptFrame, InterruptVector, make_idt_attr,
     notify_end_of_interrupt, set_idt_entry,
 };
 use mouse::mouse_cursor;
+use paging::setup_identity_page_table;
 use pci::{DEVICES, read_bar, scan_all_bus};
 use queue::ArrayQueue;
-use share::{
-    memory_map::{self, MemoryDescriptorVisitor, MemoryMap, memory_map},
-    x86,
-};
+use segment::setup_segments;
+use share::memory_map::{self, MemoryDescriptorVisitor, MemoryMap, memory_map};
 use usb::xhc;
+use x86_descriptor::DescriptorType;
 
 type Result<T> = core::result::Result<T, &'static str>;
 
@@ -89,6 +89,16 @@ fn kernel_main_new_stack() -> ! {
 }
 
 fn main() -> Result<()> {
+    setup_segments();
+
+    const KERNEL_CS: u16 = 1 << 3;
+    const KERNEL_SS: u16 = 2 << 3;
+
+    x86::set_ds_all(0);
+    x86::set_cs_ss(KERNEL_CS, KERNEL_SS);
+
+    setup_identity_page_table();
+
     let visitor = MemoryDescriptorVisitor::new(memory_map());
     visitor.for_each(|d| {
         dbg!(d.typ);
