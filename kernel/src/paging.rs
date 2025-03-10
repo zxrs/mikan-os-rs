@@ -44,7 +44,7 @@ pub fn setup_identity_page_table() {
         pdp_table().0[i_pdpt] = &page_directory().0[i_pdpt] as *const _ as u64 | 0x003;
         (0..512).for_each(|i_pd| {
             page_directory().0[i_pdpt][i_pd] =
-                (i_pdpt as u64 * PAGE_SIZE_1G + i_pd as u64 * PAGE_SIZE_2M) | 0x003;
+                (i_pdpt as u64 * PAGE_SIZE_1G + i_pd as u64 * PAGE_SIZE_2M) | 0x083;
         });
     });
 

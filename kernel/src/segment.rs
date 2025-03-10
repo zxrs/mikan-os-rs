@@ -77,8 +77,8 @@ impl SegmentDescriptor {
 
 pub fn setup_segments() {
     gdt()[0].set_data(0);
-    set_code_segment(&mut gdt()[1], DescriptorType::ExecuteRead(), 0, 0, 0xffffff);
-    set_data_segment(&mut gdt()[2], DescriptorType::ReadWrite(), 0, 0, 0xffffff);
+    set_code_segment(&mut gdt()[1], DescriptorType::ExecuteRead(), 0, 0, 0xfffff);
+    set_data_segment(&mut gdt()[2], DescriptorType::ReadWrite(), 0, 0, 0xfffff);
     let param = x86::GdtParam {
         limit: (size_of::<[SegmentDescriptor; 3]>() - 1) as u16,
         base: gdt() as *mut [SegmentDescriptor] as *mut SegmentDescriptor as usize,
@@ -95,8 +95,8 @@ fn set_code_segment(
 ) {
     desc.set_data(0);
     desc.set_base_low((base & 0xffff) as _);
-    desc.set_base_middle((base >> 16) as _);
-    desc.set_base_high((base >> 24) as _);
+    desc.set_base_middle(((base >> 16) & 0xff) as _);
+    desc.set_base_high(((base >> 24) & 0xff) as _);
 
     desc.set_limit_low((limit & 0xffff) as _);
     desc.set_limit_high(((limit >> 16) & 0xf) as _);

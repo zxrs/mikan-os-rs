@@ -3,7 +3,12 @@ pub use share::frame_buffer::{FrameBufferConfig, PixelFormat};
 
 pub static mut PIXEL_WRITER: Option<BGRPixelWriter> = None;
 
-pub fn init(writer: BGRPixelWriter) {
+pub fn init(frame_buffer_config: &'static mut FrameBufferConfig) {
+    frame_buffer_config.frame_buffer().fill(0);
+    let writer = match frame_buffer_config.pixel_format {
+        PixelFormat::BGRR => BGRPixelWriter::new(*frame_buffer_config),
+        _ => unimplemented!(),
+    };
     unsafe { PIXEL_WRITER = Some(writer) };
 }
 
@@ -19,10 +24,10 @@ pub trait PixelWriter {
     fn write(&mut self, x: u32, y: u32, rgb: Rgb) -> Result<()>;
 }
 
-pub struct BGRPixelWriter(&'static mut FrameBufferConfig);
+pub struct BGRPixelWriter(FrameBufferConfig);
 
 impl BGRPixelWriter {
-    pub fn new(frame_buffer_config: &'static mut FrameBufferConfig) -> Self {
+    pub fn new(frame_buffer_config: FrameBufferConfig) -> Self {
         Self(frame_buffer_config)
     }
 }

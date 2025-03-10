@@ -1,6 +1,7 @@
 use core::slice;
 
 #[allow(dead_code)]
+#[derive(Debug, Clone, Copy)]
 pub struct FrameBufferConfig {
     pub frame_buffer: *mut u8,
     pub pixels_per_scan_line: u32,

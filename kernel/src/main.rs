@@ -61,12 +61,7 @@ extern "C" fn kernel_main(
     frame_buffer_config: &'static mut FrameBufferConfig,
     memory_map_: &'static MemoryMap,
 ) -> ! {
-    frame_buffer_config.frame_buffer().fill(0);
-    let writer = match frame_buffer_config.pixel_format {
-        PixelFormat::BGRR => BGRPixelWriter::new(frame_buffer_config),
-        _ => unimplemented!(),
-    };
-    frame_buffer::init(writer);
+    frame_buffer::init(frame_buffer_config);
     console::init(Rgb::white(), Rgb::black());
     mouse::init(Rgb::black(), 200, 100).unwrap();
     memory_map::init(memory_map_);
@@ -99,10 +94,10 @@ fn main() -> Result<()> {
 
     setup_identity_page_table();
 
-    let visitor = MemoryDescriptorVisitor::new(memory_map());
-    visitor.for_each(|d| {
-        dbg!(d.typ);
-    });
+    // let visitor = MemoryDescriptorVisitor::new(memory_map());
+    // visitor.for_each(|d| {
+    //     dbg!(d.typ);
+    // });
 
     draw_rectangle(
         &Vector2D::new(100, 100),
