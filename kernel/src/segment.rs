@@ -1,7 +1,7 @@
 use crate::{DescriptorType, x86};
 use bit_field::BitField;
 
-static mut GDT: [SegmentDescriptor; 3] = unsafe { core::mem::zeroed() };
+static mut GDT: [SegmentDescriptor; 3] = [SegmentDescriptor::new(0); 3];
 fn gdt() -> &'static mut [SegmentDescriptor] {
     #[allow(static_mut_refs)]
     unsafe {
@@ -10,11 +10,12 @@ fn gdt() -> &'static mut [SegmentDescriptor] {
 }
 
 #[repr(transparent)]
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct SegmentDescriptor(u64);
 
 impl SegmentDescriptor {
-    pub fn new(value: u64) -> Self {
+    #[allow(dead_code)]
+    pub const fn new(value: u64) -> Self {
         Self(value)
     }
 
@@ -22,56 +23,56 @@ impl SegmentDescriptor {
         self.0 = value;
     }
 
-    pub fn set_base_high(&mut self, value: u8) {
-        self.0.set_bits(..8, value as _);
-    }
-
-    pub fn set_granularity(&mut self, value: bool) {
-        self.0.set_bit(8, value);
-    }
-
-    pub fn set_default_operation_size(&mut self, value: bool) {
-        self.0.set_bit(9, value);
-    }
-
-    pub fn set_long_mode(&mut self, value: bool) {
-        self.0.set_bit(10, value);
-    }
-
-    pub fn set_available(&mut self, value: bool) {
-        self.0.set_bit(11, value);
-    }
-
-    pub fn set_limit_high(&mut self, value: u8) {
-        self.0.set_bits(12..16, value as _);
-    }
-
-    pub fn set_present(&mut self, value: bool) {
-        self.0.set_bit(16, value);
-    }
-
-    pub fn set_descriptor_privilege_level(&mut self, value: u8) {
-        self.0.set_bits(17..19, value as _);
-    }
-
-    pub fn set_system_segment(&mut self, value: bool) {
-        self.0.set_bit(19, value);
-    }
-
-    pub fn set_type(&mut self, value: DescriptorType) {
-        self.0.set_bits(20..24, value.to_u16() as _);
-    }
-
-    pub fn set_base_middle(&mut self, value: u8) {
-        self.0.set_bits(24..32, value as _);
+    pub fn set_limit_low(&mut self, value: u16) {
+        self.0.set_bits(..16, value as _);
     }
 
     pub fn set_base_low(&mut self, value: u16) {
-        self.0.set_bits(32..48, value as _);
+        self.0.set_bits(16..32, value as _);
     }
 
-    pub fn set_limit_low(&mut self, value: u16) {
-        self.0.set_bits(48..64, value as _);
+    pub fn set_base_middle(&mut self, value: u8) {
+        self.0.set_bits(32..40, value as _);
+    }
+
+    pub fn set_type(&mut self, value: DescriptorType) {
+        self.0.set_bits(40..44, value.to_u16() as _);
+    }
+
+    pub fn set_system_segment(&mut self, value: bool) {
+        self.0.set_bit(44, value);
+    }
+
+    pub fn set_descriptor_privilege_level(&mut self, value: u8) {
+        self.0.set_bits(45..47, value as _);
+    }
+
+    pub fn set_present(&mut self, value: bool) {
+        self.0.set_bit(47, value);
+    }
+
+    pub fn set_limit_high(&mut self, value: u8) {
+        self.0.set_bits(48..52, value as _);
+    }
+
+    pub fn set_available(&mut self, value: bool) {
+        self.0.set_bit(52, value);
+    }
+
+    pub fn set_long_mode(&mut self, value: bool) {
+        self.0.set_bit(53, value);
+    }
+
+    pub fn set_default_operation_size(&mut self, value: bool) {
+        self.0.set_bit(54, value);
+    }
+
+    pub fn set_granularity(&mut self, value: bool) {
+        self.0.set_bit(55, value);
+    }
+
+    pub fn set_base_high(&mut self, value: u8) {
+        self.0.set_bits(56..64, value as _);
     }
 }
 
@@ -81,7 +82,7 @@ pub fn setup_segments() {
     set_data_segment(&mut gdt()[2], DescriptorType::ReadWrite(), 0, 0, 0xfffff);
     let param = x86::GdtParam {
         limit: (size_of::<[SegmentDescriptor; 3]>() - 1) as u16,
-        base: gdt() as *mut [SegmentDescriptor] as *mut SegmentDescriptor as usize,
+        base: &gdt()[0] as *const SegmentDescriptor as usize,
     };
     x86::load_gdt(&param);
 }

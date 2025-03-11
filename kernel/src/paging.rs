@@ -15,38 +15,38 @@ struct PdpTable([u64; 512]);
 struct PageDirectory([[u64; 512]; PAGE_DIRECTORY_COUNT]);
 
 static mut PML4_TABLE: Pml4Table = Pml4Table([0; 512]);
-fn pml4_table() -> &'static mut Pml4Table {
+fn pml4_table() -> &'static mut [u64; 512] {
     #[allow(static_mut_refs)]
     unsafe {
-        &mut PML4_TABLE
+        &mut PML4_TABLE.0
     }
 }
 
 static mut PDP_TABLE: PdpTable = PdpTable([0; 512]);
-fn pdp_table() -> &'static mut PdpTable {
+fn pdp_table() -> &'static mut [u64; 512] {
     #[allow(static_mut_refs)]
     unsafe {
-        &mut PDP_TABLE
+        &mut PDP_TABLE.0
     }
 }
 
 static mut PAGE_DIRECTORY: PageDirectory = PageDirectory([[0; 512]; PAGE_DIRECTORY_COUNT]);
-fn page_directory() -> &'static mut PageDirectory {
+fn page_directory() -> &'static mut [[u64; 512]; PAGE_DIRECTORY_COUNT] {
     #[allow(static_mut_refs)]
     unsafe {
-        &mut PAGE_DIRECTORY
+        &mut PAGE_DIRECTORY.0
     }
 }
 
 pub fn setup_identity_page_table() {
-    pml4_table().0[0] = (pdp_table().0[0] as *mut PdpTable as u64) | 0x003;
-    (0..page_directory().0.len()).for_each(|i_pdpt| {
-        pdp_table().0[i_pdpt] = &page_directory().0[i_pdpt] as *const _ as u64 | 0x003;
+    pml4_table()[0] = pdp_table().as_ptr().addr() as u64 | 0x003;
+    (0..page_directory().len()).for_each(|i_pdpt| {
+        pdp_table()[i_pdpt] = (page_directory()[i_pdpt]).as_ptr().addr() as u64 | 0x003;
         (0..512).for_each(|i_pd| {
-            page_directory().0[i_pdpt][i_pd] =
+            page_directory()[i_pdpt][i_pd] =
                 (i_pdpt as u64 * PAGE_SIZE_1G + i_pd as u64 * PAGE_SIZE_2M) | 0x083;
         });
     });
 
-    x86::set_cr3(pml4_table() as *mut Pml4Table as u64);
+    x86::set_cr3(pml4_table().as_ptr().addr() as u64);
 }

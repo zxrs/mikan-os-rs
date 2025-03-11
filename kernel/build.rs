@@ -89,5 +89,5 @@ fn main() {
             .unwrap();
     }
     println!("cargo:rustc-link-lib=static=asmfunc");
-    println!("cargo:rerun-if-changed=asmfunc.asm");
+    println!("cargo:rerun-if-changed=../mikanos/kernel/asmfunc.asm");
 }

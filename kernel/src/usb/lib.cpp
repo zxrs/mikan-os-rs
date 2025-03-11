@@ -8,7 +8,7 @@
 // ref: https://doc.rust-lang.org/nomicon/ffi.html#targeting-callbacks-to-rust-objects
 typedef void (*mouse_observer)(int8_t, int8_t);
 // typedef void (*keyboard_observer)(uint8_t, bool);
-
+  
 extern "C" {
     int UsbXhciController_initialize(usb::xhci::Controller* impl) {
         // TODO: use the passed impl variable

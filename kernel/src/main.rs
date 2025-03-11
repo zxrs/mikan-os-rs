@@ -12,7 +12,7 @@ mod macros;
 r#mod!(fonts, console, frame_buffer, graphics, mouse, pci, usb, interrupt, queue, segment, x86, x86_descriptor, paging);
 
 use console::console;
-use frame_buffer::{BGRPixelWriter, FrameBufferConfig, PixelFormat, Rgb, pixel_writer};
+use frame_buffer::{FrameBufferConfig, Rgb, pixel_writer};
 use graphics::{Vector2D, draw_rectangle};
 use interrupt::{
     IDT, InterruptDescriptor, InterruptFrame, InterruptVector, make_idt_attr,
@@ -23,7 +23,7 @@ use paging::setup_identity_page_table;
 use pci::{DEVICES, read_bar, scan_all_bus};
 use queue::ArrayQueue;
 use segment::setup_segments;
-use share::memory_map::{self, MemoryDescriptorVisitor, MemoryMap, memory_map};
+use share::memory_map::{self, MemoryMap};
 use usb::xhc;
 use x86_descriptor::DescriptorType;
 
@@ -32,11 +32,13 @@ type Result<T> = core::result::Result<T, &'static str>;
 #[repr(align(16))]
 struct KernelMainStack([u8; 1024 * 1024]);
 
+#[unsafe(no_mangle)]
 static mut KERNEL_MAIN_STACK: KernelMainStack = KernelMainStack([0; 1024 * 1024]);
-fn kernel_main_stack() -> &'static KernelMainStack {
+
+fn kernel_main_stack_() -> &'static [u8] {
     #[allow(static_mut_refs)]
     unsafe {
-        &mut KERNEL_MAIN_STACK
+        &mut KERNEL_MAIN_STACK.0
     }
 }
 
@@ -64,10 +66,10 @@ extern "C" fn kernel_main(
     frame_buffer::init(frame_buffer_config);
     console::init(Rgb::white(), Rgb::black());
     mouse::init(Rgb::black(), 200, 100).unwrap();
-    memory_map::init(memory_map_);
+    // memory_map::init(memory_map_);
 
     x86::switch_rsp(
-        kernel_main_stack() as *const KernelMainStack as usize + 1024 * 1024,
+        kernel_main_stack_().as_ptr().addr() + 1024 * 1024,
         kernel_main_new_stack,
     );
 
@@ -84,6 +86,11 @@ fn kernel_main_new_stack() -> ! {
 }
 
 fn main() -> Result<()> {
+    // frame_buffer::init(frame_buffer_config);
+    // console::init(Rgb::white(), Rgb::black());
+    // mouse::init(Rgb::black(), 200, 100).unwrap();
+
+    // memory_map::init(memory_map_);
     setup_segments();
 
     const KERNEL_CS: u16 = 1 << 3;

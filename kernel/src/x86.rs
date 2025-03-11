@@ -39,7 +39,7 @@ pub struct IdtParam {
 }
 
 pub fn load_idt(param: &IdtParam) {
-    unsafe { asm!("lidt [{0:r}]", in(reg) param) };
+    unsafe { asm!("lidt [rcx]", in("rcx") param) };
 }
 
 pub fn switch_rsp(new_rsp: usize, kernel_main_new_stack: fn() -> !) {
@@ -60,7 +60,7 @@ pub struct GdtParam {
 }
 
 pub fn load_gdt(param: &GdtParam) {
-    unsafe { asm!("lgdt [{0:r}]", in(reg) param) };
+    unsafe { asm!("lgdt [rcx]", in("rcx") param) };
 }
 
 pub fn set_ds_all(value: u16) {
