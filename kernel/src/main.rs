@@ -1,5 +1,6 @@
 #![feature(str_from_raw_parts)]
 #![feature(abi_x86_interrupt)]
+#![feature(const_trait_impl)]
 #![no_std]
 #![no_main]
 
@@ -9,7 +10,7 @@ use core::fmt::Write;
 mod macros;
 
 #[rustfmt::skip]
-r#mod!(fonts, console, frame_buffer, graphics, mouse, pci, usb, interrupt, queue, segment, x86, x86_descriptor, paging);
+r#mod!(fonts, console, frame_buffer, graphics, mouse, pci, usb, interrupt, queue, segment, x86, x86_descriptor, paging, memory_manager);
 
 use console::console;
 use frame_buffer::{FrameBufferConfig, Rgb, pixel_writer};
@@ -66,7 +67,7 @@ extern "C" fn kernel_main(
     frame_buffer::init(frame_buffer_config);
     console::init(Rgb::white(), Rgb::black());
     mouse::init(Rgb::black(), 200, 100).unwrap();
-    // memory_map::init(memory_map_);
+    memory_map::init(memory_map_);
 
     x86::switch_rsp(
         kernel_main_stack_().as_ptr().addr() + 1024 * 1024,
@@ -86,11 +87,6 @@ fn kernel_main_new_stack() -> ! {
 }
 
 fn main() -> Result<()> {
-    // frame_buffer::init(frame_buffer_config);
-    // console::init(Rgb::white(), Rgb::black());
-    // mouse::init(Rgb::black(), 200, 100).unwrap();
-
-    // memory_map::init(memory_map_);
     setup_segments();
 
     const KERNEL_CS: u16 = 1 << 3;
@@ -100,11 +96,6 @@ fn main() -> Result<()> {
     x86::set_cs_ss(KERNEL_CS, KERNEL_SS);
 
     setup_identity_page_table();
-
-    // let visitor = MemoryDescriptorVisitor::new(memory_map());
-    // visitor.for_each(|d| {
-    //     dbg!(d.typ);
-    // });
 
     draw_rectangle(
         &Vector2D::new(100, 100),

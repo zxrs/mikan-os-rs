@@ -1,9 +1,9 @@
 const MEMORY_MAP_SIZE: usize = 4096 * 4;
 
-pub static mut MEMORY_MAP: Option<&'static MemoryMap> = None;
+pub static mut MEMORY_MAP: Option<MemoryMap> = None;
 
 pub fn init(memory_map: &'static MemoryMap) {
-    unsafe { MEMORY_MAP = Some(memory_map) };
+    unsafe { MEMORY_MAP = Some(*memory_map) };
 }
 
 pub fn memory_map() -> &'static MemoryMap {
@@ -53,7 +53,7 @@ pub struct EFIMemoryDescriptor {
     pub attribute: u64,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct MemoryMap {
     pub size: usize,
     pub buf: [u8; MEMORY_MAP_SIZE],
