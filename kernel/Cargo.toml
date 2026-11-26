@@ -4,13 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-bit_field = "0.10"
+bit_field = "=0.10.4"
 
 [build-dependencies]
-cc = "1.2"
-
-[[bin]]
-name = "kernel"
-src = "src/main.rs"
-test = false
-bench = false
+cc = "=1.11.2"

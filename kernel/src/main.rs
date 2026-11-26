@@ -1,5 +1,6 @@
 // #![feature(str_from_raw_parts)]
 #![feature(abi_x86_interrupt)]
+#![allow(future_incompatible)]
 #![no_std]
 #![no_main]
 

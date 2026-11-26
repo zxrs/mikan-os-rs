@@ -1,5 +1,5 @@
 use std::env;
-use std::{path::Path, process::Command};
+// use std::{path::Path, process::Command};
 
 fn main() {
     println!("cargo:rustc-link-search=../../mikanos/x86_64-elf/lib");

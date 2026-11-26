@@ -12,4 +12,6 @@ rustflags = [
   "-Clink-arg=-nmagic",
   "-Clink-arg=-znorelro",
   "-Clink-arg=--static",
+  "-Zunstable-options",
+  "--jobs-frontend=4"
 ]
