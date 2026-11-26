@@ -1,9 +1,9 @@
-#![feature(str_from_raw_parts)]
+// #![feature(str_from_raw_parts)]
 #![feature(abi_x86_interrupt)]
 #![no_std]
 #![no_main]
 
-use core::fmt::Write;
+use core::{cell::RefCell, fmt::Write};
 
 #[macro_use]
 mod macros;
@@ -24,6 +24,20 @@ use usb::xhc;
 
 pub type Result<T> = core::result::Result<T, &'static str>;
 
+pub struct Global<T> {
+    inner: RefCell<Option<T>>,
+}
+
+unsafe impl<T> Sync for Global<T> {}
+
+impl<T> Global<T> {
+    const fn new() -> Self {
+        Self {
+            inner: RefCell::new(None),
+        }
+    }
+}
+
 #[unsafe(no_mangle)]
 extern "C" fn kernel_main(frame_buffer_config: &'static mut FrameBufferConfig) -> ! {
     main(frame_buffer_config).unwrap();
@@ -41,6 +55,7 @@ fn main(frame_buffer_config: &'static mut FrameBufferConfig) -> Result<()> {
     frame_buffer::init(writer);
     console::init(Rgb::white(), Rgb::black());
     mouse::init(Rgb::black(), 200, 100)?;
+    pci::init();
 
     draw_rectangle(
         &Vector2D::new(100, 100),
@@ -50,7 +65,11 @@ fn main(frame_buffer_config: &'static mut FrameBufferConfig) -> Result<()> {
 
     scan_all_bus()?;
 
-    let xhc_dev = unsafe { DEVICES }
+    let Some(ref devices) = *DEVICES.inner.borrow() else {
+        panic!("failed to get devices");
+    };
+
+    let xhc_dev = devices
         .iter()
         .filter_map(|dev| {
             let dev = (*dev)?;
@@ -72,7 +91,7 @@ fn main(frame_buffer_config: &'static mut FrameBufferConfig) -> Result<()> {
     set_idt_entry(
         unsafe { &mut IDT[InterruptVector::Xhci().get()] },
         attr,
-        interrupt_handler_xhci as usize as u64,
+        interrupt_handler_xhci as *const fn() as _,
         cs,
     );
 

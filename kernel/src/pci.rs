@@ -1,8 +1,5 @@
-// #![allow(unused)]
-
-use crate::{Result, console, x86};
+use crate::{Global, Result, x86};
 use bit_field::BitField;
-use core::fmt::Write;
 
 const CONFIG_ADDRESS: u16 = 0x0cf8;
 const CONFIG_DATA: u16 = 0x0cfc;
@@ -108,7 +105,11 @@ impl MSICapabilityHeader {
     }
 }
 
-pub static mut DEVICES: [Option<Device>; 32] = [None; 32];
+pub static DEVICES: Global<[Option<Device>; 32]> = Global::new();
+
+pub fn init() {
+    *DEVICES.inner.borrow_mut() = Some([None; _]);
+}
 
 pub fn scan_all_bus() -> Result<()> {
     let header_type = read_header_type(0, 0, 0);
@@ -306,18 +307,18 @@ fn make_address(bus: u8, device: u8, function: u8, reg_addr: u8) -> u32 {
         | (reg_addr as u32 & 0xfc)
 }
 
-pub fn num_devices() -> usize {
-    unsafe { DEVICES }.iter().filter(|d| d.is_some()).count()
-}
-
 fn add_device(device: Device) -> Result<()> {
-    if num_devices() == unsafe { DEVICES }.len() {
-        return Err("full");
+    let Some(ref mut devices) = *DEVICES.inner.borrow_mut() else {
+        panic!("failed to get devices");
+    };
+
+    if devices.iter().all(|d| d.is_some()) {
+        return Err("devices is full");
     }
 
-    unsafe {
-        DEVICES[num_devices()] = Some(device);
-    };
+    devices.rotate_right(1);
+    *devices.first_mut().ok_or("no first")? = Some(device);
+
     Ok(())
 }
 

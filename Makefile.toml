@@ -1,6 +1,3 @@
-# `cargo make launch` for debug build
-# `cargo make --profile prod launch` for release build
-
 [tasks.clpy]
 script = '''
 cd loader
@@ -18,28 +15,12 @@ cargo doc ${@}
 '''
 
 [tasks.loader]
-condition = { env = { "MODE" = "debug" } }
-script = '''
-cd loader
-cargo build
-'''
-
-[tasks.kernel]
-condition = { env = { "MODE" = "debug" } }
-script = '''
-cd kernel
-cargo build
-'''
-
-[tasks.loader-release]
-condition = { env = { "MODE" = "release" } }
 script = '''
 cd loader
 cargo build --release
 '''
 
-[tasks.kernel-release]
-condition = { env = { "MODE" = "release" } }
+[tasks.kernel]
 script = '''
 cd kernel
 cargo build --release
@@ -67,23 +48,24 @@ mkfs.fat -n 'MIKAN OS RS' -s 2 -f 2 -R 32 -F 32 disk.img
 mkdir -p mnt
 sudo mount -o loop disk.img mnt
 sudo mkdir -p mnt/EFI/BOOT
-sudo cp loader/target/x86_64-unknown-uefi/${MODE}/loader.efi mnt/EFI/BOOT/BOOTX64.EFI
-sudo cp kernel/target/x86_64-unknown-none/${MODE}/kernel mnt/kernel.elf
+sudo cp loader/target/x86_64-unknown-uefi/release/loader.efi mnt/EFI/BOOT/BOOTX64.EFI
+sudo cp kernel/target/x86_64-unknown-none/release/kernel mnt/kernel.elf
 sleep 1
 sudo umount mnt
 '''
-dependencies = ["loader-release", "loader", "kernel-release", "kernel"]
+dependencies = ["loader", "kernel"]
 
 [tasks.bindgen]
 script = '''
-bindgen mikanos/kernel/usb/xhci/xhci.hpp \
+bindgen ../../mikanos/kernel/usb/xhci/xhci.hpp \
 -o kernel/src/usb/bindings.rs \
 --use-core \
+--no-layout-tests \
 --allowlist-item usb::xhci::.* \
 -- \
 -std=c++17 \
--Imikanos/kernel \
--I../../osbook/denenv/x86_64-elf/include/c++/v1 \
+-I../../mikanos/kernel \
+-I../../mikanos/x86_64-elf/include/c++/v1 \
 -D__ELF__
 '''
 
@@ -98,12 +80,3 @@ qemu-system-x86_64 \
     -monitor stdio
 '''
 dependencies = ["make-image"]
-
-[env]
-MODE = "debug"
-
-[env.dev]
-MODE = "debug"
-
-[env.prod]
-MODE = "release"
