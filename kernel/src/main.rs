@@ -10,7 +10,7 @@ use core::{cell::RefCell, fmt::Write};
 mod macros;
 
 #[rustfmt::skip]
-r#mod!(fonts, console, frame_buffer, graphics, mouse, pci, x86, usb, interrupt);
+r#mod!(fonts, console, frame_buffer, graphics, mouse, pci, x86, usb, interrupt, queue);
 
 use console::console;
 use frame_buffer::{BGRPixelWriter, FrameBufferConfig, PixelFormat, Rgb, pixel_writer};
